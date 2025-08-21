@@ -23,6 +23,8 @@ Kommunal-GPT ist ein lokal laufender KI-Assistent, d.h die Sprachmodelle werden 
 
 Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUDA-fähiger Grafikkarten von Nvidia, die mindestens 16GB VRAM haben und somit in guter Geschwindigkeit die Nutzeranfragen verarbeiten können.
 
+---
+
 ## INSTALLATION
 
 ### 0. Die Setup-Dateien aus den Releases laden
@@ -32,7 +34,8 @@ Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUD
 Linux:
 
 ```bash
-./setup.sh
+chmod +x setup.sh
+bash setup.sh
 ```
 
 Windows:
@@ -48,45 +51,13 @@ setup.bat
 - Download der für Kommunal-GPT notwendigen Sprachmodelle in Ollama
 - Kommunal-GPT powered by compAInion als Frontend, basierend auf Open-WebUI (in einem Docker-Container)
 
-#### 1.2. Modelle laden
-
-Linux:
-```bash
-chmod +x models.sh
-bash models.sh
-```
-
-Windows: `models.bat`
-
-### 1.3. Erster Start zum Ressourcen anlegen
-
-*(Startet nur das compAInion Frontend)*
-
-`docker compose up`
-
-`docker compose down`
-
-### 1.4. Standard-Datenbank einsetzen
-
-Linux: `cp master-webui.db owui/data/webui.db`
-
-Windows: `copy master-webui.db owui\data\webui.db`
-
-*(Bei Nachfrage, vorhandene Dateien ersetzen)*
-
-### 1.5. Statics ersetzen
-
-Linux: `cp static/*.* owui/static`
-
-Windows: `copy static/*.* owui/static`
-
-*(Bei Nachfrage, vorhandene Dateien ersetzen)*
+---
 
 ## NUTZUNG
 
 ### 1. Start
 
-`docker compose up -d`
+`docker compose up -d` (Wird nach der Installation automatisch ausgeführt)
 
 Login für Administration: `admin@deepmentation.ai`
 

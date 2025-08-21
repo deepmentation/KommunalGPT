@@ -2,3 +2,6 @@ owui/
 elasticsearch/
 node_modules/
 .DS_Store
+
+# Ignore local env files
+.env
