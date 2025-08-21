@@ -1,0 +1,42 @@
+networks:
+  compainion-network:
+    driver: bridge
+
+services:
+  ollama:
+    volumes:
+      - ./ollama:/root/.ollama
+    container_name: ollama
+    pull_policy: always
+    tty: true
+    restart: unless-stopped
+    image: ${OLLAMA_IMAGE}:${OLLAMA_DOCKER_TAG}
+    
+  kommunal-gpt-frontend:
+    image: ${WEBUI_IMAGE}:${WEBUI_TAG}
+    networks: ['compainion-network']
+    restart: unless-stopped
+    container_name: kommunal-gpt-frontend
+    ports:
+      - "${WEBUI_PORT}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./owui/data:/app/backend/data
+      - ./owui/static:/app/build/static
+    environment:
+      - CUSTOM_NAME=${COMPAINION_NAME}
+      - WEBUI_NAME=${COMPAINION_NAME}
+      - ENABLE_SIGNUP=${ENABLE_SIGNUP}
+      - DEFAULT_LOCALE=${DEFAULT_LOCALE}
+      - USE_CUDA_DOCKER=${USE_CUDA_DOCKER}
+      - ENABLE_FOLLOW_UP_GENERATION=${ENABLE_FOLLOW_UP_GENERATION}
+
+  tika:
+    container_name: tika
+    image: ${TIKA_IMAGE}:${TIKA_TAG}
+    restart: unless-stopped
+    ports:
+      - ${TIKA_PORT}:9998
+    networks:
+      - compainion-network

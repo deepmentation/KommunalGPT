@@ -1,0 +1,22 @@
+Kommunal-GPT powered by compAInion
+Copyright (c) 2025 Deepmentation GmbH
+
+This product includes software developed by third parties:
+
+1) Open WebUI
+   - License: BSD 3-Clause (with additional branding clause)
+   - Copyright: (c) 2023-2025 Timothy Jaeryang Baek (Open WebUI)
+   - Source: https://github.com/open-webui/open-webui
+   - Notes: The branding clause restricts removal/alteration of "Open WebUI" branding except in the limited cases defined by the license (≤50 end users within any rolling 30-day period, explicit written permission, or enterprise license).
+
+2) Ollama
+   - License: MIT
+   - Copyright: (c) Ollama
+   - Source: https://github.com/ollama/ollama
+
+3) Apache Tika
+   - License: Apache License 2.0
+   - Source: https://tika.apache.org/
+   - NOTICE requirements: Preserve this NOTICE and any upstream notices in redistributions.
+
+For full license texts, see Licenses.md in this repository.
