@@ -2,10 +2,10 @@
 
 MODELS="llama3.1:8b \
 gemma3:12b \
-qwen2.5:latest \
-deepseek-r1:8b \
+qwen3:14b \
+gpt-oss:20b \
 qwen2.5-coder:14b \
-granite3.2-vision:latest"
+llava:13b"
 
 for MODEL in $MODELS; do
   echo "🔄 Downloading model: $MODEL..."

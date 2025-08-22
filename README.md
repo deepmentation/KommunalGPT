@@ -6,7 +6,7 @@ Kommunal-GPT ist Ihr lokaler KI-Assistent für tägliche Arbeiten im Kommunalber
 
 ### Administrationsrechte
 
-Das Setup von Kommunal-GPT erfordert Administrationsrechte auf Ihrem System.
+Das Setup von Kommunal-GPT erfordert Administrationsrechte (Linux sudo, Windows Admin) auf Ihrem System für die Installation von Docker.
 
 ### Systemvoraussetzungen
 
@@ -27,7 +27,23 @@ Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUD
 
 ## INSTALLATION
 
-### 0. Die Setup-Dateien aus den Releases laden
+### 0. Die Setup-Dateien aus den Releases laden und entpacken
+
+Linux CLI (z.B. Ubuntu):
+
+```bash
+wget https://github.com/deepmentation/Kommunal-GPT/releases/download/v[VERSION]/Kommunal-GPT-linux-[VERSION].zip
+unzip Kommunal-GPT-linux-[VERSION].zip -d Kommunal-GPT
+cd Kommunal-GPT
+```
+
+Windows PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/deepmentation/Kommunal-GPT/releases/download/v[VERSION]/Kommunal-GPT-windows-[VERSION].zip" -OutFile "Kommunal-GPT-windows-[VERSION].zip"
+Expand-Archive -Path "Kommunal-GPT-windows-[VERSION].zip" -DestinationPath "Kommunal-GPT"
+cd Kommunal-GPT
+```
 
 ### 1. Setup ausführen
 
@@ -38,9 +54,9 @@ chmod +x setup.sh
 bash setup.sh
 ```
 
-Windows:
+Windows PowerShell:
 
-```bash
+```powershell
 setup.bat
 ```
 

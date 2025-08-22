@@ -4,7 +4,7 @@
 
 ## Textzusammenfassung
 
-**Basismodell:** llama3.1:8b
+**Basismodell:** gemma3:12b
 
 **Beschreibung:** Fasst einen gegebenen Text präzise zusammen, indem die Hauptideen und wichtigsten Punkte klar und strukturiert dargestellt werden.
 
@@ -14,7 +14,7 @@
 
 ## Textüberprüfung
 
-**Basismodell:** llama3.1:8b
+**Basismodell:** gemma3:12b
 
 **Beschreibung:** Prüft Texte auf Grammatik, Rechtschreibung, Stil und Ausdruck, und gibt Verbesserungsvorschläge zur Optimierung.
 
@@ -90,7 +90,7 @@ Solltest du dir bei einer Antwort unsicher sein, frage den Nutzer nach mehr Info
 
 **Basismodell:** llama3.1:8b
 
-**Beschreibung:** Hilft beim Erstellen oder Bearbeiten von Texten für soziele Medien wie Linkedin.
+**Beschreibung:** Hilft beim Erstellen oder Bearbeiten von Texten für soziale Medien wie LinkedIn.
 
 **Systemprompt:**
 ```text
@@ -118,7 +118,7 @@ Antworte in deutscher Sprache!`
 
 ## Dateninterpretation
 
-**Basismodell:** qwen2.5:latest
+**Basismodell:** qwen3:14b
 
 **Beschreibung:** Analysiert Daten oder Tabellen, um zentrale Informationen, Trends und Muster klar und nachvollziehbar darzustellen. Daten können per Copy/Paste eingefügt werden oder als Anhang (Excel, CSV etc.) mitgegeben werden.
 

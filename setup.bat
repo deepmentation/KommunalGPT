@@ -74,7 +74,6 @@ if exist static (
 REM 7) System starten
 echo Starte System...
 docker compose up -d || goto :error
-echo System laeuft, sie koennen es unter http://localhost:3000 im Browser erreichen
 
 REM 8) Optional Modelle laden
 choice /M "Die Sprachmodelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern..."
@@ -86,7 +85,8 @@ if errorlevel 1 (
   )
 )
 
-echo Setup abgeschlossen. Bitte loggen Sie sich im Browser unter http://localhost:3000 ein.
+echo Setup abgeschlossen.
+echo Bitte loggen Sie sich im Browser unter http://localhost:3000 ein.
 echo E-Mail: admin@deepmentation.ai
 echo Passwort: CompAdmin#2025!
 goto :end

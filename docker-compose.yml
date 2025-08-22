@@ -7,6 +7,10 @@ services:
     volumes:
       - ./ollama:/root/.ollama
     container_name: ollama
+    ports:
+      - "${OLLAMA_PORT}:11434"
+    networks:
+      - compainion-network
     pull_policy: always
     tty: true
     restart: unless-stopped
@@ -14,7 +18,8 @@ services:
     
   kommunal-gpt-frontend:
     image: ${WEBUI_IMAGE}:${WEBUI_TAG}
-    networks: ['compainion-network']
+    networks:
+      - compainion-network
     restart: unless-stopped
     container_name: kommunal-gpt-frontend
     ports:

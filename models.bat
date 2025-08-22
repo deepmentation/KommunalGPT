@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set MODELS="llama3.1:8b gemma3:12b qwen2.5:latest deepseek-r1:8b qwen2.5-coder:14b granite3.2-vision:latest"
+set MODELS="llama3.1:8b llama3.1:8b gemma3:12b qwen3:14b gpt-oss:20b qwen2.5-coder:14b llava:13b"
 
 set MODELS=%MODELS:"=%
 

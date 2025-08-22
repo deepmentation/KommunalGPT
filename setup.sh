@@ -6,6 +6,8 @@ warn()  { echo -e "⚠️  $*"; }
 info()  { echo -e "➡️  $*"; }
 ok()    { echo -e "✅ $*"; }
 
+"=== Kommunal-GPT Setup (Linux) ==="
+
 # 1) Name abfragen
 DEFAULT_NAME="Kommunal-GPT"
 read -rp "Wie soll dein GPT heißen? [${DEFAULT_NAME}]: " COMPAINION_NAME
@@ -69,21 +71,20 @@ docker compose pull
 # 5) Initialstart nur OWUI (Ressourcen anlegen)
 title "Initialer Start (Ressourcen anlegen)"
 docker compose up -d kommunal-gpt-frontend
-sleep 8
+sleep 20
 docker compose down
 
 # 6) DB/Statics kopieren
 title "Standard-Datenbank einsetzen"
-mkdir -p owui/data owui/static
 if [[ -f "master-webui.db" ]]; then
-  cp -f master-webui.db owui/data/webui.db
+  sudo cp -f master-webui.db owui/data/webui.db
   ok "DB eingesetzt: owui/data/webui.db"
 else
   warn "master-webui.db nicht gefunden – übersprungen."
 fi
 
 if compgen -G "static/*.*" >/dev/null; then
-  cp -f static/*.* owui/static/ || true
+  sudo cp -f static/*.* owui/static/ || true
   ok "Konfiguration eingespielt"
 else
   warn "Keine Konfiguration gefunden – übersprungen."
@@ -92,16 +93,17 @@ fi
 # 7) Gesamtsystem starten
 title "Starte System"
 docker compose up -d
-ok "System läuft, sie können es unter http://localhost:3000 im Browser erreichen"
 
 # 8) Optional: Modelle laden
-warn "Die Modelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern? (n/Y): "
+warn "Die Modelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
 if [[ -x "./models.sh" ]]; then
+  chmod +x models.sh
   ./models.sh
 else
   warn "models.sh nicht ausführbar oder nicht vorhanden."
 fi
 
-ok "Setup abgeschlossen. Bitte loggen Sie sich im Browser unter http://localhost:3000 ein."
+ok "Setup abgeschlossen."
+info "Bitte loggen Sie sich im Browser unter http://localhost:3000 ein."
 info "E-Mail: admin@deepmentation.ai"
 info "Passwort: CompAdmin#2025!"
