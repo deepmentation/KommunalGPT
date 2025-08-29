@@ -6,10 +6,10 @@ warn()  { echo -e "⚠️  $*"; }
 info()  { echo -e "➡️  $*"; }
 ok()    { echo -e "✅ $*"; }
 
-"=== Kommunal-GPT Setup (Linux) ==="
+echo "=== KommunalGPT Setup (Linux) ==="
 
 # 1) Name abfragen
-DEFAULT_NAME="Kommunal-GPT"
+DEFAULT_NAME="KommunalGPT"
 read -rp "Wie soll dein GPT heißen? [${DEFAULT_NAME}]: " COMPAINION_NAME
 COMPAINION_NAME="${COMPAINION_NAME:-$DEFAULT_NAME}"
 ok "Name gesetzt: ${COMPAINION_NAME}"
@@ -70,7 +70,7 @@ docker compose pull
 
 # 5) Initialstart nur OWUI (Ressourcen anlegen)
 title "Initialer Start (Ressourcen anlegen)"
-docker compose up -d kommunal-gpt-frontend
+docker compose up -d kommunal-gpt
 sleep 20
 docker compose down
 
@@ -104,6 +104,11 @@ else
 fi
 
 ok "Setup abgeschlossen."
-info "Bitte loggen Sie sich im Browser unter http://localhost:3000 ein."
+echo "Sie finden das Dashboard im Browser unter http://localhost."
+echo " "
+echo "compAInion (Open WebUI) selbst läuft auf Port 3000 dieses Servers"
+echo "bitte loggen Sie sich im Browser unter http://localhost:3000"
+echo "zur Administration mit folgenden Daten ein:"
+echo " "
 info "E-Mail: admin@deepmentation.ai"
 info "Passwort: CompAdmin#2025!"

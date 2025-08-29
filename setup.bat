@@ -49,7 +49,7 @@ docker compose pull || goto :error
 
 REM 5) Initialstart nur Frontend
 echo Initialstart...
-docker compose up -d kommunal-gpt-frontend || goto :error
+docker compose up -d kommunal-gpt || goto :error
 timeout /t 25 /nobreak >nul
 docker compose down
 
@@ -86,7 +86,12 @@ if errorlevel 1 (
 )
 
 echo Setup abgeschlossen.
-echo Bitte loggen Sie sich im Browser unter http://localhost:3000 ein.
+echo Sie finden das Dashboard im Browser unter http://localhost.
+echo ---
+echo compAInion (Open WebUI) selbst läuft auf Port 3000 dieses Servers
+echo bitte loggen Sie sich im Browser unter http://localhost:3000
+echo zur Administration mit folgenden Daten ein:
+echo ---
 echo E-Mail: admin@deepmentation.ai
 echo Passwort: CompAdmin#2025!
 goto :end

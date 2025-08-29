@@ -40,17 +40,15 @@ services:
   compainion-ui:
     image: ${COMPAINION_UI_IMAGE}:${COMPAINION_UI_TAG}
     ports:
-      - "${FRONTEND_PORT}:80"
+      - "${COMPAINION_UI_PORT}:80"
     volumes:
       - ./data:/app/data
     environment:
-      - PORT=${FRONTEND_PORT}
+      - COMPAINION_UI_PORT=${COMPAINION_UI_PORT}
+      - COMPAINION_UI_READONLY=${COMPAINION_UI_READONLY}
+      - COMPAINION_UI_ADMIN_TOKEN=${COMPAINION_UI_ADMIN_TOKEN}
       - COMPAINION_NAME=${COMPAINION_NAME}
       - COMPAINION_DEFAULT_URL=${COMPAINION_DEFAULT_URL}
-      - COMPAINION_DEFAULT_TILES=[{"title":"Beispiel-Kachel","description":"Beschreibung der Beispiel-Kachel","deeplink":"beispiel","icon":"fa-solid fa-star"}]
-      # OPTIONAL: Nur Lesen erzwingen
-      - COMPAINION_READONLY=${COMPAINION_READONLY}
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
     restart: unless-stopped
     
   tika:
