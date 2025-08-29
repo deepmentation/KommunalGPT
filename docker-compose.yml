@@ -1,5 +1,5 @@
 networks:
-  compainion-network:
+  kommunal-gpt-network:
     driver: bridge
 
 services:
@@ -10,7 +10,7 @@ services:
     ports:
       - "${OLLAMA_PORT}:11434"
     networks:
-      - compainion-network
+      - kommunal-gpt-network
     pull_policy: always
     tty: true
     restart: unless-stopped
@@ -19,7 +19,7 @@ services:
   kommunal-gpt:
     image: ${WEBUI_IMAGE}:${WEBUI_TAG}
     networks:
-      - compainion-network
+      - kommunal-gpt-network
     restart: unless-stopped
     container_name: kommunal-gpt
     ports:
@@ -39,6 +39,9 @@ services:
 
   compainion-ui:
     image: ${COMPAINION_UI_IMAGE}:${COMPAINION_UI_TAG}
+    container_name: compainion-ui
+    networks:
+      - kommunal-gpt-network
     ports:
       - "${COMPAINION_UI_PORT}:80"
     volumes:
@@ -58,4 +61,4 @@ services:
     ports:
       - ${TIKA_PORT}:9998
     networks:
-      - compainion-network
+      - kommunal-gpt-network
