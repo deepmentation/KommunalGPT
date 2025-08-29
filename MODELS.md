@@ -1,4 +1,4 @@
-# MODELLE IN Kommunal-GPT powered by compAInion
+# MODELLE IN KommunalGPT powered by compAInion
 
 *Stand: August 2025*
 

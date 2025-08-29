@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo === Kommunal-GPT Setup (Windows) ===
+echo === KommunalGPT Setup (Windows) ===
 
 REM 1) Name abfragen
-set "DEFAULT_NAME=Kommunal-GPT"
+set "DEFAULT_NAME=KommunalGPT"
 set /p COMPAINION_NAME=Wie soll dein GPT heissen? [%DEFAULT_NAME%]: 
 if "%COMPAINION_NAME%"=="" set "COMPAINION_NAME=%DEFAULT_NAME%"
 echo Name gesetzt: %COMPAINION_NAME%

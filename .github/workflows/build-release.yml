@@ -29,14 +29,14 @@ jobs:
       - name: Prepare artifacts (ZIPs ohne Build)
         run: |
           mkdir -p artifacts
-          zip -r "artifacts/Kommunal-GPT-windows-${{ github.event.inputs.version }}.zip" . -x "*.sh" ".git/*" ".github/*" "artifacts/*"
-          zip -r "artifacts/Kommunal-GPT-linux-${{ github.event.inputs.version }}.zip" . -x "*.bat" ".git/*" ".github/*" "artifacts/*"
+          zip -r "artifacts/KommunalGPT-windows-${{ github.event.inputs.version }}.zip" . -x "*.sh" ".git/*" ".github/*" "artifacts/*"
+          zip -r "artifacts/KommunalGPT-linux-${{ github.event.inputs.version }}.zip" . -x "*.bat" ".git/*" ".github/*" "artifacts/*"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.event.inputs.version }}
-          name: Kommunal-GPT v${{ github.event.inputs.version }}
+          name: KommunalGPT v${{ github.event.inputs.version }}
           body: ${{ github.event.inputs.notes }}
           draft: false
           prerelease: false

@@ -2,15 +2,15 @@
 
 ## 1. Allgemeines
 
-Kommunal-GPT ist ein KI-Assistent, der für die tägliche Arbeit in Kommunalverwaltungen (z. B. Gemeinden, Städte, Landkreise) entwickelt wurde. Diese Nutzungsbedingungen regeln die unentgeltliche Nutzung der Software sowie der zugehörigen Materialien. Mit der Nutzung erkennen Sie diese Bedingungen an.
+KommunalGPT ist ein KI-Assistent, der für die tägliche Arbeit in Kommunalverwaltungen (z. B. Gemeinden, Städte, Landkreise) entwickelt wurde. Diese Nutzungsbedingungen regeln die unentgeltliche Nutzung der Software sowie der zugehörigen Materialien. Mit der Nutzung erkennen Sie diese Bedingungen an.
 
 ## 2. Lizenz
 
-Kommunal-GPT steht unter der Apache-2.0-Lizenz. Der vollständige Lizenztext ist der Datei `LICENSE` in diesem Repository zu entnehmen. Soweit Open-Source-Komponenten Dritter verwendet werden, gelten deren jeweilige Lizenzen (siehe `Licenses.md` und `NOTICE`).
+KommunalGPT steht unter der Apache-2.0-Lizenz. Der vollständige Lizenztext ist der Datei `LICENSE` in diesem Repository zu entnehmen. Soweit Open-Source-Komponenten Dritter verwendet werden, gelten deren jeweilige Lizenzen (siehe `Licenses.md` und `NOTICE`).
 
 ## 3. Haftungsausschluss
 
-Kommunal-GPT wird von deepmentation.ai entwickelt und bereitgestellt. Die Nutzung erfolgt auf eigenes Risiko. Wir übernehmen keine Gewähr für Richtigkeit, Vollständigkeit, Verfügbarkeit, Geeignetheit für einen bestimmten Zweck oder dauerhafte Fehlerfreiheit. Eine Haftung für leichte Fahrlässigkeit ist – außer bei Verletzung von Leben, Körper oder Gesundheit – ausgeschlossen. Unberührt bleiben zwingende gesetzliche Haftungsregelungen.
+KommunalGPT wird von deepmentation.ai entwickelt und bereitgestellt. Die Nutzung erfolgt auf eigenes Risiko. Wir übernehmen keine Gewähr für Richtigkeit, Vollständigkeit, Verfügbarkeit, Geeignetheit für einen bestimmten Zweck oder dauerhafte Fehlerfreiheit. Eine Haftung für leichte Fahrlässigkeit ist – außer bei Verletzung von Leben, Körper oder Gesundheit – ausgeschlossen. Unberührt bleiben zwingende gesetzliche Haftungsregelungen.
 
 ## 4. Support
 
@@ -18,7 +18,7 @@ Wir bieten optionalen, individuellen Support und Wartungsleistungen auf vertragl
 
 ## 5. Kostenfreie Nutzung & Berechtigte
 
-Die Nutzung von Kommunal-GPT ist für öffentliche Körperschaften im kommunalen Bereich (insb. Kommunen, Gemeinden, Städte, Landkreise, kommunale Eigenbetriebe) kostenfrei. Eine kommerzielle Nutzung außerhalb dieses Kreises bedarf einer gesonderten Vereinbarung.
+Die Nutzung von KommunalGPT ist für öffentliche Körperschaften im kommunalen Bereich (insb. Kommunen, Gemeinden, Städte, Landkreise, kommunale Eigenbetriebe) kostenfrei. Eine kommerzielle Nutzung außerhalb dieses Kreises bedarf einer gesonderten Vereinbarung.
 
 ## 6. Workshops & Schulungen
 
@@ -47,7 +47,7 @@ Eingaben (Prompts, Daten) verbleiben im Verantwortungsbereich des Nutzers. Ausga
 
 ## 11. Drittanbieter, Modelle & Abhängigkeiten
 
-Kommunal-GPT kann lokale KI-Modelle (z. B. via Ollama) oder weitere Komponenten (z. B. Apache Tika, Open WebUI) nutzen. Deren Einsatz kann gesonderten Lizenz- oder Nutzungsbedingungen unterliegen. Für die Beschaffung, Aktualität und sichere Konfiguration dieser Komponenten ist der Betreiber verantwortlich. Bitte beachten Sie außerdem Branding-/Lizenzhinweise der jeweiligen Projekte.
+KommunalGPT kann lokale KI-Modelle (z. B. via Ollama) oder weitere Komponenten (z. B. Apache Tika, Open WebUI) nutzen. Deren Einsatz kann gesonderten Lizenz- oder Nutzungsbedingungen unterliegen. Für die Beschaffung, Aktualität und sichere Konfiguration dieser Komponenten ist der Betreiber verantwortlich. Bitte beachten Sie außerdem Branding-/Lizenzhinweise der jeweiligen Projekte.
 
 ## 12. Änderungen der Nutzungsbedingungen
 
@@ -59,9 +59,9 @@ Sollten einzelne Bestimmungen dieser Nutzungsbedingungen unwirksam sein oder wer
 
 ## 14. Kontakt
 
-Kommunal-GPT powered by compAInion
-E-Mail: kontakt@kommunal-gpt.de
-Web: https://kommunal-gpt.de
+KommunalGPT powered by compAInion
+E-Mail: kontakt@KommunalGPT.de
+Web: https://KommunalGPT.de
 
 deepmentation UG (haftungsbeschränkt)
 Hans-Poeche-Str. 8
