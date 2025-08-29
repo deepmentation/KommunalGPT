@@ -66,6 +66,8 @@ setup.bat
 - Ollama als Provider für die Sprachmodelle (in einem Docker-Container)
 - Download der für Kommunal-GPT notwendigen Sprachmodelle in Ollama
 - Kommunal-GPT powered by compAInion als Frontend, basierend auf Open-WebUI (in einem Docker-Container)
+- Apache Tika als Dokumentenverarbeitung (in einem Docker-Container)
+- compAInion-UI als Frontend zur leichteren Nutzung (in einem Docker-Container)
 
 ---
 
@@ -73,7 +75,13 @@ setup.bat
 
 ### 1. Start
 
-`docker compose up -d` (Wird nach der Installation automatisch ausgeführt)
+Kommunal-GPT wird nach der Installation automatisch ausgeführt.  
+Nach Neustart des Servers muss Kommunal-GPT manuell gestartet werden.
+
+```bash
+cd Kommunal-GPT
+docker compose up -d
+```
 
 Login für Administration: `admin@deepmentation.ai`
 
@@ -81,28 +89,44 @@ Passwort für Administration: `CompAdmin#2025!`
 
 ### 2. Stop
 
-`docker compose down`
+```bash
+cd Kommunal-GPT
+docker compose down
+```
 
 ### 3. Update
 
-```
+```bash
+cd Kommunal-GPT
 docker compose down
 docker compose pull
 docker compose up -d
 ```
 
+Erklärung:
+- `cd Kommunal-GPT`: Wechsel zum Verzeichnis Kommunal-GPT
+- `docker compose down`: Stoppe Kommunal-GPT
+- `docker compose pull`: Lädt die neuesten Container
+- `docker compose up -d`: Starte Kommunal-GPT
+
 ### 4. Modelle und deren Funktion
 
-siehe MODELS.md
+siehe [MODELS.md](MODELS.md)
 
 ## Lizenzen & Drittanbieter
 
-- Dieses Repository steht unter der Lizenz: siehe `LICENSE` (Apache-2.0).
-- Drittanbieter-Hinweise: siehe `NOTICE`.
-- Vollständige Lizenztexte der eingebundenen Komponenten: siehe `Licenses.md`.
+- Dieses Repository steht unter der Lizenz: siehe [LICENSE](LICENSE) (Apache-2.0).
+- Drittanbieter-Hinweise: siehe [NOTICE](NOTICE).
+- Vollständige Lizenztexte der eingebundenen Komponenten: siehe [Licenses.md](Licenses.md).
 
 Eingesetzte Komponenten:
-- Open WebUI (BSD 3-Clause mit zusätzlicher Branding-Klausel)
-  - Hinweis: Entfernen/Ändern von "Open WebUI"-Branding ist nur in begrenzten Fällen erlaubt (≤ 50 Endnutzer in 30 Tagen, ausdrückliche Erlaubnis oder Enterprise-Lizenz). Bitte beachtet dies insbesondere bei Anpassungen im Ordner `static/`.
-- Ollama (MIT)
-- Apache Tika (Apache-2.0)
+- Open WebUI
+- Ollama
+- Apache Tika
+- compAInion-UI
+
+## Nutzungsbedingungen
+
+siehe [Nutzungsbedingungen](Nutzungsbedingungen.md)
+
+
