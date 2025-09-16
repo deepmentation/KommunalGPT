@@ -39,42 +39,104 @@ ok ".env aktualisiert"
 title "Prüfe/Installiere Docker"
 OS="$(uname -s)"
 if ! command -v docker >/dev/null 2>&1; then
-  if [[ "$OS" == "Darwin" ]]; then
-    info "macOS erkannt. Installiere Homebrew/Colima + Docker CLI (CLI-only)."
-    if ! command -v brew >/dev/null 2>&1; then
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    fi
-    brew install docker colima
-    colima start || true
-  elif [[ "$OS" == "Linux" ]]; then
-    info "Linux erkannt. Installiere Docker Engine (benötigt sudo)."
-    curl -fsSL https://get.docker.com | sh
-    if command -v systemctl >/dev/null 2>&1; then
-      sudo systemctl enable docker || true
-      sudo systemctl start docker || true
-    fi
-    if command -v usermod >/dev/null 2>&1; then
-      sudo usermod -aG docker "$USER" || true
-      warn "Du musst dich ggf. neu anmelden, damit Gruppenrechte greifen."
-    fi
-  else
-    warn "Nicht unterstütztes OS: $OS. Bitte Docker manuell installieren."
-  fi
+  warn "Docker wurde noch nicht auf dem System gefunden."
+  echo "Möchten Sie eine automatische Installation durch dieses Setup durchführen lassen"
+  echo "oder Docker selbst installieren und anschließend dieses Setup erneut starten?"
+  echo ""
+  echo "1) Automatische Installation durch Setup"
+  echo "2) Docker selbst installieren und Setup später erneut starten"
+  echo ""
+  read -rp "Ihre Wahl [1/2]: " DOCKER_CHOICE
+  
+  case "$DOCKER_CHOICE" in
+    1)
+      if [[ "$OS" == "Linux" ]]; then
+        info "Linux erkannt. Installiere Docker Engine (benötigt sudo)."
+        curl -fsSL https://get.docker.com | sh
+        if command -v systemctl >/dev/null 2>&1; then
+          sudo systemctl enable docker || true
+          sudo systemctl start docker || true
+        fi
+        if command -v usermod >/dev/null 2>&1; then
+          sudo usermod -aG docker "$USER" || true
+          warn "Du musst dich ggf. neu anmelden, damit Gruppenrechte greifen."
+        fi
+      else
+        warn "Nicht unterstütztes OS: $OS. Dieses Setup unterstützt nur Linux."
+        exit 1
+      fi
+      ;;
+    2)
+      info "Bitte installieren Sie Docker manuell und starten Sie dieses Setup anschließend erneut."
+      exit 0
+      ;;
+    *)
+      warn "Ungültige Auswahl. Setup wird beendet."
+      exit 1
+      ;;
+  esac
 else
-  ok "Docker vorhanden: $(docker --version)"
+  ok "Docker wurde bereits auf dem System gefunden, Installation von Docker wird übersprungen."
+  ok "Docker Version: $(docker --version)"
 fi
 
-# 4) Docker Compose Pull
+# 4) Ollama installieren/prüfen
+title "Prüfe/Installiere Ollama"
+if ! command -v ollama >/dev/null 2>&1; then
+  warn "Ollama wurde noch nicht auf dem System gefunden."
+  echo "Möchten Sie eine automatische Installation durch dieses Setup durchführen lassen"
+  echo "oder Ollama selbst installieren und anschließend dieses Setup erneut starten?"
+  echo ""
+  echo "1) Automatische Installation durch Setup"
+  echo "2) Ollama selbst installieren und Setup später erneut starten"
+  echo ""
+  read -rp "Ihre Wahl [1/2]: " OLLAMA_CHOICE
+  
+  case "$OLLAMA_CHOICE" in
+    1)
+      if [[ "$OS" == "Linux" ]]; then
+        info "Linux erkannt. Installiere Ollama."
+        curl -fsSL https://ollama.com/install.sh | sh
+      else
+        warn "Nicht unterstütztes OS: $OS. Dieses Setup unterstützt nur Linux."
+        exit 1
+      fi
+      # Ollama starten
+      if command -v systemctl >/dev/null 2>&1; then
+        sudo systemctl enable ollama || true
+        sudo systemctl start ollama || true
+      else
+        # Für Systeme ohne systemd
+        ollama serve &
+        sleep 5
+      fi
+      ;;
+    2)
+      info "Bitte installieren Sie Ollama manuell und starten Sie dieses Setup anschließend erneut."
+      info "Installationsanleitung: https://ollama.com/download"
+      exit 0
+      ;;
+    *)
+      warn "Ungültige Auswahl. Setup wird beendet."
+      exit 1
+      ;;
+  esac
+else
+  ok "Ollama wurde bereits auf dem System gefunden, Installation von Ollama wird übersprungen."
+  ok "Ollama Version: $(ollama --version 2>/dev/null || echo 'Version nicht verfügbar')"
+fi
+
+# 5) Docker Compose Pull
 title "Pull Docker-Images"
 docker compose pull
 
-# 5) Initialstart nur OWUI (Ressourcen anlegen)
+# 6) Initialstart nur OWUI (Ressourcen anlegen)
 title "Initialer Start (Ressourcen anlegen)"
 docker compose up -d kommunal-gpt
 sleep 20
 docker compose down
 
-# 6) DB/Statics kopieren
+# 7) DB/Statics kopieren
 title "Standard-Datenbank einsetzen"
 if [[ -f "master-webui.db" ]]; then
   sudo cp -f master-webui.db owui/data/webui.db
@@ -90,11 +152,11 @@ else
   warn "Keine Konfiguration gefunden – übersprungen."
 fi
 
-# 7) Gesamtsystem starten
+# 8) Gesamtsystem starten
 title "Starte System"
 docker compose up -d
 
-# 8) Optional: Modelle laden
+# 9) Optional: Modelle laden
 warn "Die Modelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
 if [[ -x "./models.sh" ]]; then
   chmod +x models.sh

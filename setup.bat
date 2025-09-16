@@ -29,31 +29,94 @@ echo .env aktualisiert.
 REM 3) Docker pruefen/Installieren
 where docker >nul 2>nul
 if errorlevel 1 (
-  echo Docker nicht gefunden.
-  choice /M "Soll Docker Desktop via winget installiert werden?"
-  if errorlevel 1 (
-    winget install -e --id Docker.DockerDesktop
-    echo Bitte Docker Desktop starten, ggf. Logout/Login.
-  ) else (
-    echo Bitte installiere Docker Desktop manuell und starte dieses Skript erneut.
+  echo Docker wurde noch nicht auf dem System gefunden.
+  echo Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen
+  echo oder Docker selbst installieren und anschliessend dieses Setup erneut starten?
+  echo.
+  echo 1) Automatische Installation durch Setup
+  echo 2) Docker selbst installieren und Setup spaeter erneut starten
+  echo.
+  choice /C 12 /M "Ihre Wahl"
+  if errorlevel 2 (
+    echo Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschliessend erneut.
+    echo Download: https://www.docker.com/products/docker-desktop/
     goto :end
   )
+  if errorlevel 1 (
+    echo Installiere Docker Desktop via winget...
+    winget install -e --id Docker.DockerDesktop
+    if errorlevel 1 (
+      echo Fehler bei der Docker-Installation. Bitte Docker Desktop manuell installieren.
+      goto :end
+    )
+    echo Bitte Docker Desktop starten, ggf. Logout/Login erforderlich.
+    echo Druecken Sie eine beliebige Taste, wenn Docker Desktop gestartet ist...
+    pause >nul
+  )
 ) else (
+  echo Docker wurde bereits auf dem System gefunden, Installation von Docker wird uebersprungen.
   for /f "tokens=*" %%v in ('docker --version') do set DOCKERV=%%v
-  echo Docker gefunden: %DOCKERV%
+  echo Docker Version: %DOCKERV%
 )
 
-REM 4) Pull Images
+REM 4) Ollama pruefen/Installieren
+where ollama >nul 2>nul
+if errorlevel 1 (
+  echo Ollama wurde noch nicht auf dem System gefunden.
+  echo Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen
+  echo oder Ollama selbst installieren und anschliessend dieses Setup erneut starten?
+  echo.
+  echo 1) Automatische Installation durch Setup
+  echo 2) Ollama selbst installieren und Setup spaeter erneut starten
+  echo.
+  choice /C 12 /M "Ihre Wahl"
+  if errorlevel 2 (
+    echo Bitte installieren Sie Ollama manuell und starten Sie dieses Setup anschliessend erneut.
+    echo Download: https://ollama.com/download
+    goto :end
+  )
+  if errorlevel 1 (
+    echo Installiere Ollama...
+    REM Versuche zuerst winget
+    winget install -e --id Ollama.Ollama
+    if errorlevel 1 (
+      echo Winget-Installation fehlgeschlagen. Versuche direkten Download...
+      REM Fallback: Direkter Download und Installation
+      powershell -NoProfile -Command ^
+        "Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe' -OutFile 'OllamaSetup.exe'; " ^
+        "Start-Process -FilePath 'OllamaSetup.exe' -Wait; " ^
+        "Remove-Item 'OllamaSetup.exe' -Force"
+      if errorlevel 1 (
+        echo Fehler bei der Ollama-Installation. Bitte Ollama manuell installieren.
+        goto :end
+      )
+    )
+    echo Ollama wurde installiert. Starte Ollama-Service...
+    REM Ollama Service starten
+    start /B ollama serve
+    timeout /t 5 /nobreak >nul
+  )
+) else (
+  echo Ollama wurde bereits auf dem System gefunden, Installation von Ollama wird uebersprungen.
+  for /f "tokens=*" %%v in ('ollama --version 2^>nul') do set OLLAMAV=%%v
+  if defined OLLAMAV (
+    echo Ollama Version: %OLLAMAV%
+  ) else (
+    echo Ollama Version: Version nicht verfuegbar
+  )
+)
+
+REM 5) Pull Images
 echo Pull Images...
 docker compose pull || goto :error
 
-REM 5) Initialstart nur Frontend
+REM 6) Initialstart nur Frontend
 echo Initialstart...
 docker compose up -d kommunal-gpt || goto :error
 timeout /t 25 /nobreak >nul
 docker compose down
 
-REM 6) DB/Statics kopieren
+REM 7) DB/Statics kopieren
 echo Kopiere Standard-Datenbank...
 if not exist owui\data mkdir owui\data
 if not exist owui\static mkdir owui\static
@@ -71,11 +134,11 @@ if exist static (
   echo static\-Verzeichnis nicht gefunden – uebersprungen.
 )
 
-REM 7) System starten
+REM 8) System starten
 echo Starte System...
 docker compose up -d || goto :error
 
-REM 8) Optional Modelle laden
+REM 9) Optional Modelle laden
 choice /M "Die Sprachmodelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern..."
 if errorlevel 1 (
   if exist models.bat (
