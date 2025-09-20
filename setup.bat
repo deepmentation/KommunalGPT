@@ -60,50 +60,66 @@ if errorlevel 1 (
 )
 
 REM 4) Ollama pruefen/Installieren
-where ollama >nul 2>nul
-if errorlevel 1 (
-  echo Ollama wurde noch nicht auf dem System gefunden.
-  echo Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen
-  echo oder Ollama selbst installieren und anschliessend dieses Setup erneut starten?
-  echo.
-  echo 1) Automatische Installation durch Setup
-  echo 2) Ollama selbst installieren und Setup spaeter erneut starten
-  echo.
-  choice /C 12 /M "Ihre Wahl"
-  if errorlevel 2 (
-    echo Bitte installieren Sie Ollama manuell und starten Sie dieses Setup anschliessend erneut.
-    echo Download: https://ollama.com/download
-    goto :end
+echo Pruefe Ollama-Installation...
+
+REM Pruefe ob Ollama API bereits erreichbar ist
+set OLLAMA_RUNNING=false
+set OLLAMA_TYPE=unknown
+
+curl -s http://localhost:11434/api/version >nul 2>nul
+if not errorlevel 1 (
+  set OLLAMA_RUNNING=true
+  echo Ollama API ist bereits erreichbar
+  
+  REM Pruefe ob es ein Docker-Container ist
+  for /f "delims=" %%C in ('docker ps --format "{{.Names}}" 2^>nul ^| findstr /i "^ollama$"') do (
+    echo Ollama laeuft bereits als Docker-Container
+    set OLLAMA_TYPE=docker
+    goto :ollama_detected
   )
-  if errorlevel 1 (
-    echo Installiere Ollama...
-    REM Versuche zuerst winget
-    winget install -e --id Ollama.Ollama
-    if errorlevel 1 (
-      echo Winget-Installation fehlgeschlagen. Versuche direkten Download...
-      REM Fallback: Direkter Download und Installation
-      powershell -NoProfile -Command ^
-        "Invoke-WebRequest -Uri 'https://ollama.com/download/OllamaSetup.exe' -OutFile 'OllamaSetup.exe'; " ^
-        "Start-Process -FilePath 'OllamaSetup.exe' -Wait; " ^
-        "Remove-Item 'OllamaSetup.exe' -Force"
-      if errorlevel 1 (
-        echo Fehler bei der Ollama-Installation. Bitte Ollama manuell installieren.
-        goto :end
-      )
-    )
-    echo Ollama wurde installiert. Starte Ollama-Service...
-    REM Ollama Service starten
-    start /B ollama serve
-    timeout /t 5 /nobreak >nul
+  
+  echo Ollama laeuft lokal auf dem System
+  set OLLAMA_TYPE=local
+  goto :ollama_detected
+)
+
+REM Pruefe ob Ollama installiert aber nicht gestartet ist
+where ollama >nul 2>nul
+if not errorlevel 1 (
+  echo Ollama ist installiert, aber API nicht erreichbar. Starte Ollama...
+  start /B ollama serve
+  timeout /t 5 /nobreak >nul
+  
+  curl -s http://localhost:11434/api/version >nul 2>nul
+  if not errorlevel 1 (
+    set OLLAMA_RUNNING=true
+    set OLLAMA_TYPE=local
+    echo Ollama erfolgreich gestartet
+    goto :ollama_detected
+  ) else (
+    echo Ollama konnte nicht gestartet werden. Verwende Docker-Container.
+    set OLLAMA_TYPE=docker
   )
 ) else (
-  echo Ollama wurde bereits auf dem System gefunden, Installation von Ollama wird uebersprungen.
-  for /f "tokens=*" %%v in ('ollama --version 2^>nul') do set OLLAMAV=%%v
-  if defined OLLAMAV (
-    echo Ollama Version: %OLLAMAV%
+  echo Ollama wurde noch nicht auf dem System gefunden.
+  echo Das Setup wird Ollama als Docker-Container bereitstellen.
+  set OLLAMA_TYPE=docker
+)
+
+:ollama_detected
+REM Informiere ueber Modell-Installation
+if "%OLLAMA_RUNNING%"=="true" (
+  if "%OLLAMA_TYPE%"=="local" (
+    echo Hinweis: Das bereits lokal installierte Ollama wird verwendet.
+    echo Die Modelle werden in die lokale Ollama-Installation geladen.
+    echo Das models.bat Skript wird entsprechend angepasst ausgefuehrt.
   ) else (
-    echo Ollama Version: Version nicht verfuegbar
+    echo Hinweis: Das bereits als Docker-Container laufende Ollama wird verwendet.
+    echo Modelle werden in den Container geladen.
   )
+) else (
+  echo Ollama wird als Docker-Container bereitgestellt.
+  echo Modelle werden nach dem Start in den Container geladen.
 )
 
 REM 5) Pull Images

@@ -29,7 +29,9 @@ Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUD
 
 ### 0. Die Setup-Dateien aus den Releases laden und entpacken
 
-Linux CLI (z.B. Ubuntu):
+Laden Sie den aktuellen Release aus diesem Repository manuell herunter und entpacken es oder nutzen Sie die folgenden Befehle für Download und Entpacken:
+
+**Linux CLI (z.B. Ubuntu):**
 
 ```bash
 wget https://github.com/deepmentation/KommunalGPT/releases/download/v[VERSION]/KommunalGPT-linux-[VERSION].zip
@@ -37,7 +39,7 @@ unzip KommunalGPT-linux-[VERSION].zip -d KommunalGPT
 cd KommunalGPT
 ```
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/deepmentation/KommunalGPT/releases/download/v[VERSION]/KommunalGPT-windows-[VERSION].zip" -OutFile "KommunalGPT-windows-[VERSION].zip"
@@ -47,14 +49,14 @@ cd KommunalGPT
 
 ### 1. Setup ausführen
 
-Linux:
+**Linux:**
 
 ```bash
 chmod +x setup.sh
 bash setup.sh
 ```
 
-Windows PowerShell:
+**Windows PowerShell:**
 
 ```powershell
 setup.bat

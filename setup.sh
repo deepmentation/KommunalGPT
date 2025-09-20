@@ -82,48 +82,59 @@ fi
 
 # 4) Ollama installieren/prüfen
 title "Prüfe/Installiere Ollama"
-if ! command -v ollama >/dev/null 2>&1; then
-  warn "Ollama wurde noch nicht auf dem System gefunden."
-  echo "Möchten Sie eine automatische Installation durch dieses Setup durchführen lassen"
-  echo "oder Ollama selbst installieren und anschließend dieses Setup erneut starten?"
-  echo ""
-  echo "1) Automatische Installation durch Setup"
-  echo "2) Ollama selbst installieren und Setup später erneut starten"
-  echo ""
-  read -rp "Ihre Wahl [1/2]: " OLLAMA_CHOICE
+
+# Prüfe ob Ollama API bereits erreichbar ist
+OLLAMA_RUNNING=false
+if curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+  OLLAMA_RUNNING=true
+  OLLAMA_VERSION=$(curl -s http://localhost:11434/api/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unbekannt")
+  ok "Ollama API ist bereits erreichbar (Version: $OLLAMA_VERSION)"
   
-  case "$OLLAMA_CHOICE" in
-    1)
-      if [[ "$OS" == "Linux" ]]; then
-        info "Linux erkannt. Installiere Ollama."
-        curl -fsSL https://ollama.com/install.sh | sh
-      else
-        warn "Nicht unterstütztes OS: $OS. Dieses Setup unterstützt nur Linux."
-        exit 1
-      fi
-      # Ollama starten
-      if command -v systemctl >/dev/null 2>&1; then
-        sudo systemctl enable ollama || true
-        sudo systemctl start ollama || true
-      else
-        # Für Systeme ohne systemd
-        ollama serve &
-        sleep 5
-      fi
-      ;;
-    2)
-      info "Bitte installieren Sie Ollama manuell und starten Sie dieses Setup anschließend erneut."
-      info "Installationsanleitung: https://ollama.com/download"
-      exit 0
-      ;;
-    *)
-      warn "Ungültige Auswahl. Setup wird beendet."
-      exit 1
-      ;;
-  esac
+  # Prüfe ob es ein Docker-Container ist
+  if docker ps --format '{{.Names}}' | grep -q '^ollama$'; then
+    ok "Ollama läuft bereits als Docker-Container"
+    OLLAMA_TYPE="docker"
+  else
+    ok "Ollama läuft lokal auf dem System"
+    OLLAMA_TYPE="local"
+  fi
+elif command -v ollama >/dev/null 2>&1; then
+  warn "Ollama ist installiert, aber API nicht erreichbar. Starte Ollama..."
+  if command -v systemctl >/dev/null 2>&1; then
+    sudo systemctl start ollama || true
+    sleep 5
+  else
+    ollama serve &
+    sleep 5
+  fi
+  
+  if curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+    OLLAMA_RUNNING=true
+    OLLAMA_TYPE="local"
+    ok "Ollama erfolgreich gestartet"
+  else
+    warn "Ollama konnte nicht gestartet werden. Verwende Docker-Container."
+    OLLAMA_TYPE="docker"
+  fi
 else
-  ok "Ollama wurde bereits auf dem System gefunden, Installation von Ollama wird übersprungen."
-  ok "Ollama Version: $(ollama --version 2>/dev/null || echo 'Version nicht verfügbar')"
+  info "Ollama wurde noch nicht auf dem System gefunden."
+  info "Das Setup wird Ollama als Docker-Container bereitstellen."
+  OLLAMA_TYPE="docker"
+fi
+
+# Informiere über Modell-Installation
+if [[ "$OLLAMA_RUNNING" == "true" ]]; then
+  if [[ "$OLLAMA_TYPE" == "local" ]]; then
+    ok "Hinweis: Das bereits lokal installierte Ollama wird verwendet."
+    warn "Die Modelle werden in die lokale Ollama-Installation geladen."
+    warn "Das models.sh Skript wird entsprechend angepasst ausgeführt."
+  else
+    ok "Hinweis: Das bereits als Docker-Container laufende Ollama wird verwendet."
+    ok "Modelle werden in den Container geladen."
+  fi
+else
+  ok "Ollama wird als Docker-Container bereitgestellt."
+  ok "Modelle werden nach dem Start in den Container geladen."
 fi
 
 # 5) Docker Compose Pull
