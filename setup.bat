@@ -18,12 +18,7 @@ if not exist ".env" (
   )
 )
 REM COMPAINION_NAME setzen/ersetzen
-powershell -NoProfile -Command ^
-  "$envPath='.env';" ^
-  "$c=Get-Content $envPath; " ^
-  "if($c -match '^COMPAINION_NAME='){ $c=$c -replace '^COMPAINION_NAME=.*', 'COMPAINION_NAME='''%COMPAINION_NAME%''' } else { $c+=\"`nCOMPAINION_NAME=''%COMPAINION_NAME%''\" };" ^
-  "if($c -match '^OLLAMA_BASE_URL='){ $c=$c -replace '^OLLAMA_BASE_URL=.*', 'OLLAMA_BASE_URL=''http://localhost:11434''' } else { $c+=\"`nOLLAMA_BASE_URL=''http://localhost:11434''\" };" ^
-  "Set-Content -NoNewline -Path $envPath -Value ($c -join \"`n\")"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0UpdateEnv.ps1" -Name "%COMPAINION_NAME%"
 echo .env aktualisiert.
 
 REM 3) Docker pruefen/Installieren
@@ -102,7 +97,6 @@ if not errorlevel 1 (
   )
 ) else (
   echo Ollama wurde noch nicht auf dem System gefunden.
-  echo Das Setup wird Ollama als Docker-Container bereitstellen.
   set OLLAMA_TYPE=docker
 )
 
