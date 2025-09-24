@@ -21,13 +21,15 @@ KommunalGPT ist ein lokal laufender KI-Assistent, d.h die Sprachmodelle werden a
 | Grafikkarten-VRAM | 16GB | 24GB | 48GB |
 | Bauart | z.B. Workstation | Workstation oder Server | Rack-Server |
 
+Betriebssystem: Windows 11 oder Windows Server, Linux Debian 12+ oder Ubuntu Server 24 LTS
+
 Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUDA-fähiger Grafikkarten von Nvidia, die mindestens 16GB VRAM haben und somit in guter Geschwindigkeit die Nutzeranfragen verarbeiten können.
 
 ---
 
 ## INSTALLATION
 
-### 0. Die Setup-Dateien aus den Releases laden und entpacken
+### 0. Die Setup-Datei aus den Releases laden und entpacken
 
 Laden Sie den aktuellen Release aus diesem Repository manuell herunter und entpacken es oder nutzen Sie die folgenden Befehle für Download und Entpacken:
 
@@ -59,7 +61,7 @@ bash setup.sh
 **Windows PowerShell:**
 
 ```powershell
-setup.bat
+.\setup.bat
 ```
 
 #### 1.1. Was wird installiert?
