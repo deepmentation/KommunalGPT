@@ -165,7 +165,7 @@ echo compAInion (Open WebUI) selbst läuft auf Port 3000 dieses Servers
 echo bitte loggen Sie sich im Browser unter http://localhost:3000
 echo zur Administration mit folgenden Daten ein:
 echo ---
-echo E-Mail: admin@deepmentation.ai
+echo E-Mail: hello@deepmentation.ai
 echo Passwort: CompAdmin#2025!
 goto :end
 

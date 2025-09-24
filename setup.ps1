@@ -2,11 +2,15 @@
 # Requires PowerShell 5.1 or higher
 
 param(
-    [string]$GPTName = ""
+    [string]$GPTName = "",
+    [string]$ResumeFromStep = ""
 )
 
 # Set error action preference
 $ErrorActionPreference = "Stop"
+
+# Setup State Management
+$StateFile = "setup-state.json"
 
 # Helper functions
 function Write-Title {
@@ -43,6 +47,101 @@ function Test-CommandExists {
     catch {
         return $false
     }
+}
+
+# State Management Functions
+function Save-SetupState {
+    param(
+        [string]$CurrentStep,
+        [hashtable]$Data = @{}
+    )
+    
+    $state = @{
+        CurrentStep = $CurrentStep
+        Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        Data = $Data
+    }
+    
+    $state | ConvertTo-Json | Set-Content $StateFile
+    Write-Info "Setup-Status gespeichert: $CurrentStep"
+}
+
+function Get-SetupState {
+    if (Test-Path $StateFile) {
+        try {
+            $state = Get-Content $StateFile | ConvertFrom-Json
+            return @{
+                CurrentStep = $state.CurrentStep
+                Data = $state.Data
+            }
+        }
+        catch {
+            Write-Warning "Setup-Status konnte nicht gelesen werden. Starte von vorne."
+            return $null
+        }
+    }
+    return $null
+}
+
+function Clear-SetupState {
+    if (Test-Path $StateFile) {
+        Remove-Item $StateFile -Force
+        Write-Info "Setup-Status geloescht"
+    }
+}
+
+function Request-Reboot {
+    param([string]$Reason, [string]$NextStep)
+    
+    Write-Warning $Reason
+    Write-Info "Ein Neustart wird empfohlen, damit die Aenderungen wirksam werden."
+    Write-Host ""
+    
+    $rebootChoice = Read-Host "Moechten Sie jetzt neu starten? Das Setup wird automatisch fortgesetzt. (J/n)"
+    
+    if ([string]::IsNullOrEmpty($rebootChoice) -or $rebootChoice -match "^[JjYy]") {
+        # Status für Fortsetzung nach Reboot speichern
+        Save-SetupState -CurrentStep $NextStep -Data @{
+            GPTName = $script:GPTName
+        }
+        
+        Write-Info "Setup wird nach dem Neustart automatisch fortgesetzt..."
+        Write-Info "Fuehren Sie nach dem Neustart einfach 'setup.ps1' erneut aus."
+        Write-Host ""
+        Write-Warning "System wird in 10 Sekunden neu gestartet..."
+        Start-Sleep -Seconds 10
+        
+        Restart-Computer -Force
+        exit 0
+    } else {
+        Write-Info "Neustart uebersprungen. Setup wird fortgesetzt..."
+        Write-Warning "Hinweis: Manche Funktionen koennten erst nach einem Neustart verfuegbar sein."
+    }
+}
+
+function Initialize-DockerPath {
+    # Prüfe ob Docker bereits verfügbar ist
+    if (Test-CommandExists "docker") {
+        return $true
+    }
+    
+    # Übliche Docker-Installationspfade
+    $dockerPaths = @(
+        "${env:ProgramFiles}\Docker\Docker\resources\bin",
+        "${env:ProgramFiles(x86)}\Docker\Docker\resources\bin",
+        "$env:USERPROFILE\AppData\Local\Programs\Docker\Docker\resources\bin",
+        "${env:ProgramFiles}\Docker Desktop\resources\bin"
+    )
+    
+    foreach ($path in $dockerPaths) {
+        if (Test-Path "$path\docker.exe") {
+            Write-Info "Docker gefunden in: $path"
+            $env:PATH = "$path;$env:PATH"
+            return $true
+        }
+    }
+    
+    return $false
 }
 
 function Test-OllamaAPI {
@@ -89,99 +188,148 @@ function Get-UserChoice {
 try {
     Write-Host "=== KommunalGPT Setup (Windows PowerShell) ===" -ForegroundColor Magenta
 
-    # 1) Name abfragen
-    Write-Title "Konfiguration"
-    $defaultName = "KommunalGPT"
+    # Prüfe ob Setup fortgesetzt werden soll
+    $savedState = Get-SetupState
+    $startStep = "config"
     
-    if ([string]::IsNullOrEmpty($GPTName)) {
-        $GPTName = Read-Host "Wie soll Ihr GPT heissen? [$defaultName]"
-        if ([string]::IsNullOrEmpty($GPTName)) {
-            $GPTName = $defaultName
+    if ($savedState -and [string]::IsNullOrEmpty($ResumeFromStep)) {
+        Write-Info "Vorheriger Setup-Status gefunden: $($savedState.CurrentStep)"
+        $resumeChoice = Read-Host "Moechten Sie das Setup von diesem Punkt fortsetzen? (J/n)"
+        
+        if ([string]::IsNullOrEmpty($resumeChoice) -or $resumeChoice -match "^[JjYy]") {
+            $startStep = $savedState.CurrentStep
+            if ($savedState.Data.GPTName) {
+                $GPTName = $savedState.Data.GPTName
+            }
+            Write-Success "Setup wird fortgesetzt ab: $startStep"
+        } else {
+            Clear-SetupState
+            Write-Info "Setup wird von vorne gestartet"
         }
+    } elseif (-not [string]::IsNullOrEmpty($ResumeFromStep)) {
+        $startStep = $ResumeFromStep
+        Write-Info "Setup wird fortgesetzt ab: $startStep"
     }
-    
-    Write-Success "Name gesetzt: $GPTName"
+
+    # Setup Steps mit State Management
+    $script:GPTName = $GPTName
+
+    # 1) Name abfragen
+    if ($startStep -eq "config") {
+        Write-Title "Konfiguration"
+        $defaultName = "KommunalGPT"
+        
+        if ([string]::IsNullOrEmpty($GPTName)) {
+            $GPTName = Read-Host "Wie soll Ihr GPT heissen? [$defaultName]"
+            if ([string]::IsNullOrEmpty($GPTName)) {
+                $GPTName = $defaultName
+            }
+        }
+        
+        $script:GPTName = $GPTName
+        Write-Success "Name gesetzt: $GPTName"
+        Save-SetupState -CurrentStep "env" -Data @{ GPTName = $GPTName }
+    }
 
     # 2) .env erstellen/aktualisieren
-    Write-Title "Konfiguriere .env"
-    
-    if (-not (Test-Path ".env")) {
-        if (Test-Path ".env.example") {
-            Copy-Item ".env.example" ".env"
-        } else {
-            New-Item -Path ".env" -ItemType File | Out-Null
+    if ($startStep -eq "config" -or $startStep -eq "env") {
+        Write-Title "Konfiguriere .env"
+        
+        if (-not (Test-Path ".env")) {
+            if (Test-Path ".env.example") {
+                Copy-Item ".env.example" ".env"
+            } else {
+                New-Item -Path ".env" -ItemType File | Out-Null
+            }
         }
-    }
 
-    # .env Datei aktualisieren
-    $envContent = @()
-    if (Test-Path ".env") {
-        $envContent = Get-Content ".env"
-    }
+        # .env Datei aktualisieren
+        $envContent = @()
+        if (Test-Path ".env") {
+            $envContent = Get-Content ".env"
+        }
 
-    # COMPAINION_NAME setzen/ersetzen
-    $GPTNameSet = $false
-    $ollamaUrlSet = $false
-    
-    for ($i = 0; $i -lt $envContent.Length; $i++) {
-        if ($envContent[$i] -match "^COMPAINION_NAME=") {
-            $envContent[$i] = "COMPAINION_NAME='$GPTName'"
-            $GPTNameSet = $true
+        # COMPAINION_NAME setzen/ersetzen
+        $GPTNameSet = $false
+        $ollamaUrlSet = $false
+        
+        for ($i = 0; $i -lt $envContent.Length; $i++) {
+            if ($envContent[$i] -match "^COMPAINION_NAME=") {
+                $envContent[$i] = "COMPAINION_NAME='$GPTName'"
+                $GPTNameSet = $true
+            }
+            elseif ($envContent[$i] -match "^OLLAMA_BASE_URL=") {
+                $envContent[$i] = "OLLAMA_BASE_URL='http://localhost:11434'"
+                $ollamaUrlSet = $true
+            }
         }
-        elseif ($envContent[$i] -match "^OLLAMA_BASE_URL=") {
-            $envContent[$i] = "OLLAMA_BASE_URL='http://localhost:11434'"
-            $ollamaUrlSet = $true
+        
+        if (-not $GPTNameSet) {
+            $envContent += "COMPAINION_NAME='$GPTName'"
         }
+        if (-not $ollamaUrlSet) {
+            $envContent += "OLLAMA_BASE_URL='http://localhost:11434'"
+        }
+        
+        $envContent | Set-Content ".env"
+        Write-Success ".env aktualisiert"
+        Save-SetupState -CurrentStep "docker" -Data @{ GPTName = $GPTName }
     }
-    
-    if (-not $GPTNameSet) {
-        $envContent += "COMPAINION_NAME='$GPTName'"
-    }
-    if (-not $ollamaUrlSet) {
-        $envContent += "OLLAMA_BASE_URL='http://localhost:11434'"
-    }
-    
-    $envContent | Set-Content ".env"
-    Write-Success ".env aktualisiert"
 
     # 3) Docker pruefen/installieren
-    Write-Title "Pruefe/Installiere Docker"
-    
-    if (-not (Test-CommandExists "docker")) {
-        Write-Warning "Docker wurde noch nicht auf dem System gefunden."
+    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker") {
+        Write-Title "Pruefe/Installiere Docker"
         
-        $dockerOptions = @(
-            "Automatische Installation durch Setup",
-            "Docker selbst installieren und Setup spaeter erneut starten"
-        )
-        
-        $dockerChoice = Get-UserChoice -Prompt "Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen oder Docker selbst installieren?" -Options $dockerOptions
-        
-        switch ($dockerChoice) {
-            1 {
-                Write-Info "Installiere Docker Desktop via winget..."
-                try {
-                    winget install -e --id Docker.DockerDesktop
-                    Write-Success "Docker Desktop wurde installiert."
-                    Write-Info "Bitte Docker Desktop starten, ggf. Logout/Login erforderlich."
-                    Read-Host "Druecken Sie Enter, wenn Docker Desktop gestartet ist"
+        # Versuche Docker-Pfad zu initialisieren
+        if (-not (Initialize-DockerPath)) {
+            Write-Warning "Docker wurde noch nicht auf dem System gefunden."
+            
+            $dockerOptions = @(
+                "Automatische Installation durch Setup",
+                "Docker selbst installieren und Setup spaeter erneut starten"
+            )
+            
+            $dockerChoice = Get-UserChoice -Prompt "Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen oder Docker selbst installieren?" -Options $dockerOptions
+            
+            switch ($dockerChoice) {
+                1 {
+                    Write-Info "Installiere Docker Desktop via winget..."
+                    try {
+                        winget install -e --id Docker.DockerDesktop
+                        Write-Success "Docker Desktop wurde installiert."
+                        
+                        # Reboot nach Docker-Installation anbieten
+                        Request-Reboot -Reason "Docker Desktop wurde installiert." -NextStep "ollama"
+                        
+                        # Falls kein Reboot: Versuche Docker zu finden
+                        Write-Info "Bitte Docker Desktop starten..."
+                        Read-Host "Druecken Sie Enter, wenn Docker Desktop gestartet ist"
+                        
+                        if (-not (Initialize-DockerPath)) {
+                            Write-Error "Docker konnte auch nach der Installation nicht gefunden werden."
+                            Write-Info "Ein Neustart wird dringend empfohlen."
+                            Request-Reboot -Reason "Docker ist nach Installation nicht verfuegbar." -NextStep "ollama"
+                        }
+                    }
+                    catch {
+                        Write-Error "Fehler bei der Docker-Installation. Bitte Docker Desktop manuell installieren."
+                        Write-Info "Download: https://www.docker.com/products/docker-desktop/"
+                        exit 1
+                    }
                 }
-                catch {
-                    Write-Error "Fehler bei der Docker-Installation. Bitte Docker Desktop manuell installieren."
+                2 {
+                    Write-Info "Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschliessend erneut."
                     Write-Info "Download: https://www.docker.com/products/docker-desktop/"
-                    exit 1
+                    Save-SetupState -CurrentStep "docker" -Data @{ GPTName = $GPTName }
+                    exit 0
                 }
             }
-            2 {
-                Write-Info "Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschliessend erneut."
-                Write-Info "Download: https://www.docker.com/products/docker-desktop/"
-                exit 0
-            }
+        } else {
+            Write-Success "Docker wurde bereits auf dem System gefunden, Installation von Docker wird uebersprungen."
+            $dockerVersion = docker --version
+            Write-Success "Docker Version: $dockerVersion"
         }
-    } else {
-        Write-Success "Docker wurde bereits auf dem System gefunden, Installation von Docker wird uebersprungen."
-        $dockerVersion = docker --version
-        Write-Success "Docker Version: $dockerVersion"
+        Save-SetupState -CurrentStep "ollama" -Data @{ GPTName = $GPTName }
     }
 
     # 4) Ollama pruefen/installieren
@@ -253,26 +401,55 @@ try {
 
     # 5) Pull Images
     Write-Title "Pull Docker-Images"
+    
+    # Stelle sicher, dass Docker verfügbar ist
+    if (-not (Initialize-DockerPath)) {
+        Write-Error "Docker ist nicht verfuegbar. Bitte installieren Sie Docker Desktop und starten Sie das Setup erneut."
+        exit 1
+    }
+    
     try {
-        docker compose pull
-        Write-Success "Docker Images erfolgreich geladen"
+        Write-Info "Lade Docker Images... (Dies kann einige Minuten dauern)"
+        $pullResult = docker compose pull 2>&1
+        
+        # Prüfe auf Fehler in der Ausgabe
+        if ($LASTEXITCODE -ne 0 -or $pullResult -match "error|Error|ERROR") {
+            Write-Warning "Warnung beim Laden der Docker Images:"
+            Write-Host $pullResult -ForegroundColor Yellow
+            Write-Info "Versuche trotzdem fortzufahren..."
+        } else {
+            Write-Success "Docker Images erfolgreich geladen"
+        }
     }
     catch {
-        Write-Error "Fehler beim Laden der Docker Images"
-        throw
+        Write-Error "Fehler beim Laden der Docker Images: $($_.Exception.Message)"
+        Write-Info "Stellen Sie sicher, dass Docker Desktop gestartet ist und Sie mit dem Internet verbunden sind."
+        Write-Info "Versuche trotzdem fortzufahren..."
     }
 
     # 6) Initialstart nur Frontend
     Write-Title "Initialer Start (Ressourcen anlegen)"
     try {
-        docker compose up -d kommunal-gpt
+        Write-Info "Starte KommunalGPT Container..."
+        $startResult = docker compose up -d kommunal-gpt 2>&1
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Warnung beim Starten des Containers:"
+            Write-Host $startResult -ForegroundColor Yellow
+        } else {
+            Write-Success "Container erfolgreich gestartet"
+        }
+        
+        Write-Info "Warte 25 Sekunden auf Initialisierung..."
         Start-Sleep -Seconds 25
-        docker compose down
+        
+        Write-Info "Stoppe Container..."
+        docker compose down | Out-Null
         Write-Success "Initiale Ressourcen erfolgreich angelegt"
     }
     catch {
-        Write-Error "Fehler beim initialen Start"
-        throw
+        Write-Error "Fehler beim initialen Start: $($_.Exception.Message)"
+        Write-Info "Versuche trotzdem fortzufahren..."
     }
 
     # 7) DB/Statics kopieren
@@ -340,6 +517,10 @@ try {
     # Setup abgeschlossen
     Write-Title "Setup abgeschlossen"
     Write-Success "Setup erfolgreich abgeschlossen!"
+    
+    # Setup-Status löschen da erfolgreich abgeschlossen
+    Clear-SetupState
+    
     Write-Host ""
     Write-Info "Sie finden das Dashboard im Browser unter http://localhost"
     Write-Host ""
@@ -347,12 +528,13 @@ try {
     Write-Info "bitte loggen Sie sich im Browser unter http://localhost:3000"
     Write-Info "zur Administration mit folgenden Daten ein:"
     Write-Host ""
-    Write-Success "E-Mail: admin@deepmentation.ai"
+    Write-Success "E-Mail: hello@deepmentation.ai"
     Write-Success "Passwort: CompAdmin#2025!"
 
 }
 catch {
     Write-Error "Fehler beim Ausfuehren des Setups: $($_.Exception.Message)"
     Write-Host "Bitte ueberpruefen Sie die Ausgabe und versuchen Sie es erneut." -ForegroundColor Red
+    Write-Info "Der Setup-Status wurde gespeichert. Sie koennen das Setup spaeter fortsetzen."
     exit 1
 }
