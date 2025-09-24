@@ -5,7 +5,7 @@ echo === KommunalGPT Setup (Windows) ===
 
 REM 1) Name abfragen
 set "DEFAULT_NAME=KommunalGPT"
-set /p COMPAINION_NAME=Wie soll dein GPT heissen? [%DEFAULT_NAME%]: 
+set /p COMPAINION_NAME=Wie soll Ihr GPT heissen? [%DEFAULT_NAME%]: 
 if "%COMPAINION_NAME%"=="" set "COMPAINION_NAME=%DEFAULT_NAME%"
 echo Name gesetzt: %COMPAINION_NAME%
 
@@ -28,10 +28,10 @@ if errorlevel 1 (
   echo Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen
   echo oder Docker selbst installieren und anschliessend dieses Setup erneut starten?
   echo.
-  echo 1) Automatische Installation durch Setup
-  echo 2) Docker selbst installieren und Setup spaeter erneut starten
+  echo 1 - Automatische Installation durch Setup
+  echo 2 - Docker selbst installieren und Setup spaeter erneut starten
   echo.
-  choice /C 12 /M "Ihre Wahl"
+  choice /C 12 /M "Ihre Wahl "
   if errorlevel 2 (
     echo Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschliessend erneut.
     echo Download: https://www.docker.com/products/docker-desktop/
