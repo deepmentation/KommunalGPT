@@ -17,22 +17,22 @@ $Models = @(
 # Helper functions
 function Write-Info {
     param([string]$Message)
-    Write-Host "➡️  $Message" -ForegroundColor Blue
+    Write-Host "[INFO] $Message" -ForegroundColor Blue
 }
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "✅ $Message" -ForegroundColor Green
+    Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
 function Write-Warning {
     param([string]$Message)
-    Write-Host "⚠️  $Message" -ForegroundColor Yellow
+    Write-Host "[WARN] $Message" -ForegroundColor Yellow
 }
 
 function Write-Error {
     param([string]$Message)
-    Write-Host "❌ $Message" -ForegroundColor Red
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
 function Test-CommandExists {
@@ -57,7 +57,7 @@ function Test-OllamaAPI {
 }
 
 function Get-OllamaType {
-    # Prüfe auf Docker-Container
+    # Pruefe auf Docker-Container
     try {
         $containers = docker ps --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "ollama" }
         if ($containers) {
@@ -68,7 +68,7 @@ function Get-OllamaType {
         # Docker-Befehl fehlgeschlagen, ignorieren
     }
     
-    # Prüfe auf lokale Installation
+    # Pruefe auf lokale Installation
     if ((Test-CommandExists "ollama") -and (Test-OllamaAPI)) {
         return "local"
     }
@@ -78,7 +78,7 @@ function Get-OllamaType {
 
 function Start-OllamaContainer {
     try {
-        Write-Warning "Ollama-Container läuft nicht. Starte temporär..."
+        Write-Warning "Ollama-Container laeuft nicht. Starte temporaer..."
         docker compose up -d ollama
         Start-Sleep -Seconds 5
         return $true
@@ -93,7 +93,7 @@ function Download-ModelDocker {
     param([string]$ModelName)
     
     try {
-        # Prüfe ob Container läuft
+        # Pruefe ob Container laeuft
         $containers = docker ps --format "{{.Names}}" | Where-Object { $_ -eq "ollama" }
         if (-not $containers) {
             if (-not (Start-OllamaContainer)) {
@@ -134,14 +134,14 @@ try {
 
     switch ($ollamaType) {
         "docker" {
-            Write-Success "🐳 Ollama Docker-Container erkannt. Lade Modelle in Container..."
+            Write-Success "Ollama Docker-Container erkannt. Lade Modelle in Container..."
         }
         "local" {
-            Write-Success "💻 Lokale Ollama-Installation erkannt. Lade Modelle lokal..."
+            Write-Success "Lokale Ollama-Installation erkannt. Lade Modelle lokal..."
         }
         "none" {
-            Write-Error "❌ Keine funktionierende Ollama-Installation gefunden."
-            Write-Info "Bitte starten Sie zuerst das Setup oder stellen Sie sicher, dass Ollama läuft."
+            Write-Error "Keine funktionierende Ollama-Installation gefunden."
+            Write-Info "Bitte starten Sie zuerst das Setup oder stellen Sie sicher, dass Ollama laeuft."
             exit 1
         }
     }
@@ -149,7 +149,7 @@ try {
     Write-Host ""
     Write-Info "Folgende Modelle werden geladen:"
     foreach ($model in $Models) {
-        Write-Host "  • $model" -ForegroundColor Gray
+        Write-Host "  - $model" -ForegroundColor Gray
     }
     Write-Host ""
 
@@ -158,7 +158,7 @@ try {
 
     # Modelle laden
     foreach ($model in $Models) {
-        Write-Info "🔄 Downloading model: $model..."
+        Write-Info "Downloading model: $model..."
         
         $success = $false
         switch ($ollamaType) {
@@ -171,10 +171,10 @@ try {
         }
         
         if ($success) {
-            Write-Success "✅ Finished downloading: $model"
+            Write-Success "Finished downloading: $model"
             $successCount++
         } else {
-            Write-Error "❌ Error downloading: $model"
+            Write-Error "Error downloading: $model"
             $failCount++
         }
         
@@ -188,14 +188,14 @@ try {
     
     if ($failCount -gt 0) {
         Write-Warning "Fehlgeschlagen: $failCount Modelle"
-        Write-Info "Bitte überprüfen Sie die Fehler und versuchen Sie es bei Bedarf erneut."
+        Write-Info "Bitte ueberpruefen Sie die Fehler und versuchen Sie es bei Bedarf erneut."
     } else {
-        Write-Success "🎉 Alle Modelle erfolgreich geladen!"
+        Write-Success "Alle Modelle erfolgreich geladen!"
     }
 
 }
 catch {
     Write-Error "Unerwarteter Fehler beim Laden der Modelle: $($_.Exception.Message)"
-    Write-Host "Bitte überprüfen Sie die Ausgabe und versuchen Sie es erneut." -ForegroundColor Red
+    Write-Host "Bitte ueberpruefen Sie die Ausgabe und versuchen Sie es erneut." -ForegroundColor Red
     exit 1
 }

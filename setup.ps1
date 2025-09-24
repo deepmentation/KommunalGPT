@@ -16,22 +16,22 @@ function Write-Title {
 
 function Write-Info {
     param([string]$Message)
-    Write-Host "➡️  $Message" -ForegroundColor Blue
+    Write-Host "[INFO] $Message" -ForegroundColor Blue
 }
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "✅ $Message" -ForegroundColor Green
+    Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
 function Write-Warning {
     param([string]$Message)
-    Write-Host "⚠️  $Message" -ForegroundColor Yellow
+    Write-Host "[WARN] $Message" -ForegroundColor Yellow
 }
 
 function Write-Error {
     param([string]$Message)
-    Write-Host "❌ $Message" -ForegroundColor Red
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
 function Test-CommandExists {
@@ -81,7 +81,7 @@ function Get-UserChoice {
         catch {
             # Invalid input, continue loop
         }
-        Write-Warning "Ungültige Eingabe. Bitte wählen Sie eine Zahl zwischen 1 und $($Options.Length)."
+        Write-Warning "Ungueltiger Eingabe. Bitte waehlen Sie eine Zahl zwischen 1 und $($Options.Length)."
     } while ($true)
 }
 
@@ -94,7 +94,7 @@ try {
     $defaultName = "KommunalGPT"
     
     if ([string]::IsNullOrEmpty($GPTName)) {
-        $GPTName = Read-Host "Wie soll Ihr GPT heißen? [$defaultName]"
+        $GPTName = Read-Host "Wie soll Ihr GPT heissen? [$defaultName]"
         if ([string]::IsNullOrEmpty($GPTName)) {
             $GPTName = $defaultName
         }
@@ -144,18 +144,18 @@ try {
     $envContent | Set-Content ".env"
     Write-Success ".env aktualisiert"
 
-    # 3) Docker prüfen/installieren
-    Write-Title "Prüfe/Installiere Docker"
+    # 3) Docker pruefen/installieren
+    Write-Title "Pruefe/Installiere Docker"
     
     if (-not (Test-CommandExists "docker")) {
         Write-Warning "Docker wurde noch nicht auf dem System gefunden."
         
         $dockerOptions = @(
             "Automatische Installation durch Setup",
-            "Docker selbst installieren und Setup später erneut starten"
+            "Docker selbst installieren und Setup spaeter erneut starten"
         )
         
-        $dockerChoice = Get-UserChoice -Prompt "Möchten Sie eine automatische Installation durch dieses Setup durchführen lassen oder Docker selbst installieren?" -Options $dockerOptions
+        $dockerChoice = Get-UserChoice -Prompt "Moechten Sie eine automatische Installation durch dieses Setup durchfuehren lassen oder Docker selbst installieren?" -Options $dockerOptions
         
         switch ($dockerChoice) {
             1 {
@@ -164,7 +164,7 @@ try {
                     winget install -e --id Docker.DockerDesktop
                     Write-Success "Docker Desktop wurde installiert."
                     Write-Info "Bitte Docker Desktop starten, ggf. Logout/Login erforderlich."
-                    Read-Host "Drücken Sie Enter, wenn Docker Desktop gestartet ist"
+                    Read-Host "Druecken Sie Enter, wenn Docker Desktop gestartet ist"
                 }
                 catch {
                     Write-Error "Fehler bei der Docker-Installation. Bitte Docker Desktop manuell installieren."
@@ -173,41 +173,41 @@ try {
                 }
             }
             2 {
-                Write-Info "Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschließend erneut."
+                Write-Info "Bitte installieren Sie Docker Desktop manuell und starten Sie dieses Setup anschliessend erneut."
                 Write-Info "Download: https://www.docker.com/products/docker-desktop/"
                 exit 0
             }
         }
     } else {
-        Write-Success "Docker wurde bereits auf dem System gefunden, Installation von Docker wird übersprungen."
+        Write-Success "Docker wurde bereits auf dem System gefunden, Installation von Docker wird uebersprungen."
         $dockerVersion = docker --version
         Write-Success "Docker Version: $dockerVersion"
     }
 
-    # 4) Ollama prüfen/installieren
-    Write-Title "Prüfe/Installiere Ollama"
+    # 4) Ollama pruefen/installieren
+    Write-Title "Pruefe/Installiere Ollama"
     
     $ollamaRunning = $false
     $ollamaType = "unknown"
     
-    # Prüfe ob Ollama API bereits erreichbar ist
+    # Pruefe ob Ollama API bereits erreichbar ist
     if (Test-OllamaAPI) {
         $ollamaRunning = $true
         Write-Success "Ollama API ist bereits erreichbar"
         
-        # Prüfe ob es ein Docker-Container ist
+        # Pruefe ob es ein Docker-Container ist
         try {
             $containers = docker ps --format "{{.Names}}" 2>$null | Where-Object { $_ -eq "ollama" }
             if ($containers) {
-                Write-Success "Ollama läuft bereits als Docker-Container"
+                Write-Success "Ollama laeuft bereits als Docker-Container"
                 $ollamaType = "docker"
             } else {
-                Write-Success "Ollama läuft lokal auf dem System"
+                Write-Success "Ollama laeuft lokal auf dem System"
                 $ollamaType = "local"
             }
         }
         catch {
-            Write-Success "Ollama läuft lokal auf dem System"
+            Write-Success "Ollama laeuft lokal auf dem System"
             $ollamaType = "local"
         }
     }
@@ -236,12 +236,12 @@ try {
         $ollamaType = "docker"
     }
 
-    # Informiere über Modell-Installation
+    # Informiere ueber Modell-Installation
     if ($ollamaRunning) {
         if ($ollamaType -eq "local") {
             Write-Success "Hinweis: Das bereits lokal installierte Ollama wird verwendet."
             Write-Warning "Die Modelle werden in die lokale Ollama-Installation geladen."
-            Write-Warning "Das models.ps1 Skript wird entsprechend angepasst ausgeführt."
+            Write-Warning "Das models.ps1 Skript wird entsprechend angepasst ausgefuehrt."
         } else {
             Write-Success "Hinweis: Das bereits als Docker-Container laufende Ollama wird verwendet."
             Write-Success "Modelle werden in den Container geladen."
@@ -291,7 +291,7 @@ try {
         Copy-Item "master-webui.db" "owui\data\webui.db" -Force
         Write-Success "DB eingesetzt: owui\data\webui.db"
     } else {
-        Write-Warning "master-webui.db nicht gefunden – übersprungen."
+        Write-Warning "master-webui.db nicht gefunden - uebersprungen."
     }
 
     # Static files kopieren
@@ -304,7 +304,7 @@ try {
             Write-Warning "Fehler beim Kopieren der Static-Dateien"
         }
     } else {
-        Write-Warning "static-Verzeichnis nicht gefunden – übersprungen."
+        Write-Warning "static-Verzeichnis nicht gefunden - uebersprungen."
     }
 
     # 8) System starten
@@ -322,7 +322,7 @@ try {
     Write-Title "Modelle laden"
     Write-Warning "Die Sprachmodelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
     
-    $loadModels = Read-Host "Möchten Sie die Modelle jetzt laden? (J/n)"
+    $loadModels = Read-Host "Moechten Sie die Modelle jetzt laden? (J/n)"
     if ([string]::IsNullOrEmpty($loadModels) -or $loadModels -match "^[JjYy]") {
         if (Test-Path "models.ps1") {
             Write-Info "Starte models.ps1..."
@@ -333,7 +333,7 @@ try {
             & ".\models.bat"
         }
         else {
-            Write-Warning "Weder models.ps1 noch models.bat gefunden – übersprungen."
+            Write-Warning "Weder models.ps1 noch models.bat gefunden - uebersprungen."
         }
     }
 
@@ -343,7 +343,7 @@ try {
     Write-Host ""
     Write-Info "Sie finden das Dashboard im Browser unter http://localhost"
     Write-Host ""
-    Write-Info "compAInion (Open WebUI) selbst läuft auf Port 3000 dieses Servers"
+    Write-Info "compAInion (Open WebUI) selbst laeuft auf Port 3000 dieses Servers"
     Write-Info "bitte loggen Sie sich im Browser unter http://localhost:3000"
     Write-Info "zur Administration mit folgenden Daten ein:"
     Write-Host ""
@@ -352,7 +352,7 @@ try {
 
 }
 catch {
-    Write-Error "Fehler beim Ausführen des Setups: $($_.Exception.Message)"
-    Write-Host "Bitte überprüfen Sie die Ausgabe und versuchen Sie es erneut." -ForegroundColor Red
+    Write-Error "Fehler beim Ausfuehren des Setups: $($_.Exception.Message)"
+    Write-Host "Bitte ueberpruefen Sie die Ausgabe und versuchen Sie es erneut." -ForegroundColor Red
     exit 1
 }
