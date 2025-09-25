@@ -10,7 +10,7 @@ Das Setup von KommunalGPT erfordert Administrationsrechte (Linux sudo, Windows A
 
 ### Systemvoraussetzungen
 
-KommunalGPT ist ein lokal laufender KI-Assistent, d.h die Sprachmodelle werden auf Ihrer Hardware ausgeführt. Damit dies in ausreichender Performance läuft, empfehlen wir folgende Systemvoraussetzungen:
+KommunalGPT ist ein lokal laufender KI-Assistent, d.h die Sprachmodelle werden auf Ihrer Hardware ausgeführt. Damit dies in ausreichender Performance läuft, empfehlen wir folgende Hardware als Grundlage:
 
 | Komponente | Empfehlung für bis zu 20 gleichzeitige Benutzer | für bis zu 50 gleichzeitige Benutzer | für bis zu 100 gleichzeitige Benutzer |
 | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ KommunalGPT ist ein lokal laufender KI-Assistent, d.h die Sprachmodelle werden a
 | Grafikkarten-VRAM | 16GB | 24GB | 48GB |
 | Bauart | z.B. Workstation | Workstation oder Server | Rack-Server |
 
-Betriebssystem: Windows 11 oder Windows Server, Linux Debian 12+ oder Ubuntu Server 24 LTS
+Betriebssystem: Windows 11, besser Windows Server, Linux Debian 12+ oder Ubuntu Server 24 LTS
 
 Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUDA-fähiger Grafikkarten von Nvidia, die mindestens 16GB VRAM haben und somit in guter Geschwindigkeit die Nutzeranfragen verarbeiten können.
 
@@ -31,7 +31,8 @@ Für eine zufriedenstellende Nutzererfahrung empfehlen wir immer den Einsatz CUD
 
 ### 0. Die Setup-Datei aus den Releases laden und entpacken
 
-Laden Sie den aktuellen Release aus diesem Repository manuell herunter und entpacken es oder nutzen Sie die folgenden Befehle für Download und Entpacken:
+Laden Sie den aktuellen Release aus diesem Repository manuell herunter und entpacken es in ein Verzeichnis Ihrer Wahl auf der Partition mit der oben angegenen Kapazität.  
+Nutzen Sie alternativ die folgenden Befehle für Download und Entpacken:
 
 **Linux CLI (z.B. Ubuntu):**
 
@@ -53,6 +54,8 @@ cd KommunalGPT
 
 **Linux:**
 
+Zunächst die Rechte für die Setup-Datei setzen und dann den Setup-Befehl ausführen:
+
 ```bash
 chmod +x setup.sh
 bash setup.sh
@@ -61,15 +64,25 @@ bash setup.sh
 **Windows PowerShell:**
 
 ```powershell
-.\setup.bat
+.\setup.ps1
 ```
+
+Es kann vorkommen, dass die Ausführung nicht signierter Skripte blockiert wird. In diesem Fall können Sie die Ausführung erlauben, indem Sie den folgenden Befehl ausführen:
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+Weiterhin wird empfohlen, nach der Installation von Docker das System neu zu starten.  
+Das Setup wird dies vorschlagen.  
+Nach dem Neustart wechseln Sie erneut in das Verzeichnis KommunalGPT und führen Sie den Setup-Befehl erneut wie oben beschrieben aus.
 
 #### 1.1. Was wird installiert?
 
 - Docker als Container-Engine
 - Ollama als Provider für die Sprachmodelle (in einem Docker-Container)
 - Download der für KommunalGPT notwendigen Sprachmodelle in Ollama
-- KommunalGPT powered by compAInion als Frontend, basierend auf Open-WebUI (in einem Docker-Container)
+- KommunalGPT Nutzeroberfläche mit Chat-Funktion und Einstellungen für Administratoren, basierend auf Open-WebUI (in einem Docker-Container)
 - Apache Tika als Dokumentenverarbeitung (in einem Docker-Container)
 - compAInion-UI als Frontend zur leichteren Nutzung (in einem Docker-Container)
 
