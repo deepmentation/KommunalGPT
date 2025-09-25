@@ -144,6 +144,58 @@ function Initialize-DockerPath {
     return $false
 }
 
+function Test-DockerRunning {
+    try {
+        $null = docker version 2>$null
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
+        return $false
+    }
+}
+
+function Start-DockerDesktop {
+    Write-Info "Versuche Docker Desktop zu starten..."
+    
+    # Mögliche Docker Desktop Pfade
+    $dockerDesktopPaths = @(
+        "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe",
+        "${env:ProgramFiles(x86)}\Docker\Docker\Docker Desktop.exe",
+        "$env:USERPROFILE\AppData\Local\Programs\Docker\Docker\Docker Desktop.exe"
+    )
+    
+    foreach ($path in $dockerDesktopPaths) {
+        if (Test-Path $path) {
+            Write-Info "Starte Docker Desktop von: $path"
+            Start-Process -FilePath $path -WindowStyle Hidden
+            
+            # Warte auf Docker Desktop Start
+            Write-Info "Warte auf Docker Desktop Start (bis zu 60 Sekunden)..."
+            $timeout = 60
+            $elapsed = 0
+            
+            while ($elapsed -lt $timeout) {
+                Start-Sleep -Seconds 5
+                $elapsed += 5
+                
+                if (Test-DockerRunning) {
+                    Write-Success "Docker Desktop erfolgreich gestartet"
+                    return $true
+                }
+                
+                Write-Host "." -NoNewline -ForegroundColor Yellow
+            }
+            
+            Write-Host ""
+            Write-Warning "Docker Desktop Start dauert länger als erwartet"
+            return $false
+        }
+    }
+    
+    Write-Warning "Docker Desktop konnte nicht gefunden werden"
+    return $false
+}
+
 function Test-OllamaAPI {
     try {
         $response = Invoke-RestMethod -Uri "http://localhost:11434/api/version" -Method Get -TimeoutSec 5 -ErrorAction Stop
@@ -400,56 +452,86 @@ try {
     }
 
     # 5) Pull Images
-    Write-Title "Pull Docker-Images"
-    
-    # Stelle sicher, dass Docker verfügbar ist
-    if (-not (Initialize-DockerPath)) {
-        Write-Error "Docker ist nicht verfuegbar. Bitte installieren Sie Docker Desktop und starten Sie das Setup erneut."
-        exit 1
-    }
-    
-    try {
-        Write-Info "Lade Docker Images... (Dies kann einige Minuten dauern)"
-        $pullResult = docker compose pull 2>&1
+    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama") {
+        Write-Title "Pull Docker-Images"
         
-        # Prüfe auf Fehler in der Ausgabe
-        if ($LASTEXITCODE -ne 0 -or $pullResult -match "error|Error|ERROR") {
-            Write-Warning "Warnung beim Laden der Docker Images:"
-            Write-Host $pullResult -ForegroundColor Yellow
-            Write-Info "Versuche trotzdem fortzufahren..."
-        } else {
-            Write-Success "Docker Images erfolgreich geladen"
+        # Stelle sicher, dass Docker verfügbar und läuft
+        if (-not (Initialize-DockerPath)) {
+            Write-Error "Docker ist nicht verfuegbar. Bitte installieren Sie Docker Desktop und starten Sie das Setup erneut."
+            exit 1
         }
-    }
-    catch {
-        Write-Error "Fehler beim Laden der Docker Images: $($_.Exception.Message)"
-        Write-Info "Stellen Sie sicher, dass Docker Desktop gestartet ist und Sie mit dem Internet verbunden sind."
-        Write-Info "Versuche trotzdem fortzufahren..."
+        
+        if (-not (Test-DockerRunning)) {
+            Write-Warning "Docker Desktop laeuft nicht. Versuche zu starten..."
+            
+            if (-not (Start-DockerDesktop)) {
+                Write-Error "Docker Desktop konnte nicht gestartet werden."
+                Write-Info "Bitte starten Sie Docker Desktop manuell und führen Sie das Setup erneut aus."
+                Write-Info "Alternativ können Sie das System neu starten."
+                exit 1
+            }
+        } else {
+            Write-Success "Docker Desktop läuft bereits"
+        }
+        
+        try {
+            Write-Info "Lade Docker Images... (Dies kann einige Minuten dauern)"
+            $pullResult = docker compose pull 2>&1
+            
+            # Prüfe auf Fehler in der Ausgabe
+            if ($LASTEXITCODE -ne 0 -or $pullResult -match "error|Error|ERROR") {
+                Write-Warning "Warnung beim Laden der Docker Images:"
+                Write-Host $pullResult -ForegroundColor Yellow
+                Write-Info "Versuche trotzdem fortzufahren..."
+            } else {
+                Write-Success "Docker Images erfolgreich geladen"
+            }
+        }
+        catch {
+            Write-Error "Fehler beim Laden der Docker Images: $($_.Exception.Message)"
+            Write-Info "Stellen Sie sicher, dass Docker Desktop gestartet ist und Sie mit dem Internet verbunden sind."
+            Write-Info "Versuche trotzdem fortzufahren..."
+        }
+        Save-SetupState -CurrentStep "init" -Data @{ GPTName = $GPTName }
     }
 
     # 6) Initialstart nur Frontend
-    Write-Title "Initialer Start (Ressourcen anlegen)"
-    try {
-        Write-Info "Starte KommunalGPT Container..."
-        $startResult = docker compose up -d kommunal-gpt 2>&1
+    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama" -or $startStep -eq "init") {
+        Write-Title "Initialer Start (Ressourcen anlegen)"
         
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Warnung beim Starten des Containers:"
-            Write-Host $startResult -ForegroundColor Yellow
-        } else {
-            Write-Success "Container erfolgreich gestartet"
+        # Stelle sicher, dass Docker läuft
+        if (-not (Test-DockerRunning)) {
+            Write-Warning "Docker Desktop läuft nicht. Versuche zu starten..."
+            if (-not (Start-DockerDesktop)) {
+                Write-Error "Docker Desktop konnte nicht gestartet werden."
+                Write-Info "Bitte starten Sie Docker Desktop manuell und führen Sie das Setup erneut aus."
+                exit 1
+            }
         }
         
-        Write-Info "Warte 25 Sekunden auf Initialisierung..."
-        Start-Sleep -Seconds 25
-        
-        Write-Info "Stoppe Container..."
-        docker compose down | Out-Null
-        Write-Success "Initiale Ressourcen erfolgreich angelegt"
-    }
-    catch {
-        Write-Error "Fehler beim initialen Start: $($_.Exception.Message)"
-        Write-Info "Versuche trotzdem fortzufahren..."
+        try {
+            Write-Info "Starte KommunalGPT Container..."
+            $startResult = docker compose up -d kommunal-gpt 2>&1
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Warnung beim Starten des Containers:"
+                Write-Host $startResult -ForegroundColor Yellow
+            } else {
+                Write-Success "Container erfolgreich gestartet"
+            }
+            
+            Write-Info "Warte 25 Sekunden auf Initialisierung..."
+            Start-Sleep -Seconds 25
+            
+            Write-Info "Stoppe Container..."
+            docker compose down | Out-Null
+            Write-Success "Initiale Ressourcen erfolgreich angelegt"
+        }
+        catch {
+            Write-Error "Fehler beim initialen Start: $($_.Exception.Message)"
+            Write-Info "Versuche trotzdem fortzufahren..."
+        }
+        Save-SetupState -CurrentStep "files" -Data @{ GPTName = $GPTName }
     }
 
     # 7) DB/Statics kopieren
@@ -486,6 +568,17 @@ try {
 
     # 8) System starten
     Write-Title "Starte System"
+    
+    # Stelle sicher, dass Docker läuft
+    if (-not (Test-DockerRunning)) {
+        Write-Warning "Docker Desktop läuft nicht. Versuche zu starten..."
+        if (-not (Start-DockerDesktop)) {
+            Write-Error "Docker Desktop konnte nicht gestartet werden."
+            Write-Info "Bitte starten Sie Docker Desktop manuell und führen Sie das Setup erneut aus."
+            exit 1
+        }
+    }
+    
     try {
         docker compose up -d
         Write-Success "System erfolgreich gestartet"
