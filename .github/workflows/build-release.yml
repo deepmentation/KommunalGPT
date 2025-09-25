@@ -92,12 +92,15 @@ jobs:
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
           fi
           
-          # Escape für GitHub Output
-          CHANGELOG="${CHANGELOG//'%'/'%25'}"
-          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
-          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          # Schreibe Changelog in temporäre Datei
+          echo "$CHANGELOG" > changelog.txt
           
-          echo "changelog=${CHANGELOG}" >> $GITHUB_OUTPUT
+          # Setze als Output (ohne Escaping)
+          {
+            echo "changelog<<EOF"
+            cat changelog.txt
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create and push tag
         run: |
@@ -137,26 +140,29 @@ jobs:
       - name: Prepare Release Body
         id: release_body
         run: |
-          RELEASE_BODY="## KommunalGPT v${{ needs.versioning.outputs.new_version }}
+          # Erstelle Release Body in temporärer Datei
+          cat > release_body.md << 'EOF'
+          ## KommunalGPT v${{ needs.versioning.outputs.new_version }}
           
           ### Änderungen seit dem letzten Release:
           ${{ needs.versioning.outputs.changelog }}
           
           ### Downloads:
-          - **Windows**: \`KommunalGPT-windows-${{ needs.versioning.outputs.new_version }}.zip\`
-          - **Linux**: \`KommunalGPT-linux-${{ needs.versioning.outputs.new_version }}.zip\`
+          - **Windows**: `KommunalGPT-windows-${{ needs.versioning.outputs.new_version }}.zip`
+          - **Linux**: `KommunalGPT-linux-${{ needs.versioning.outputs.new_version }}.zip`
           
           ### Installation:
           ZIP-Datei herunterladen und gemäß README.md installieren
           
-          ${{ github.event.inputs.release_notes }}"
+          ${{ github.event.inputs.release_notes }}
+          EOF
           
-          # Escape für GitHub Output
-          RELEASE_BODY="${RELEASE_BODY//'%'/'%25'}"
-          RELEASE_BODY="${RELEASE_BODY//$'\n'/'%0A'}"
-          RELEASE_BODY="${RELEASE_BODY//$'\r'/'%0D'}"
-          
-          echo "release_body=${RELEASE_BODY}" >> $GITHUB_OUTPUT
+          # Setze als Output (ohne Escaping)
+          {
+            echo "release_body<<EOF"
+            cat release_body.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
