@@ -11,7 +11,8 @@ $Models = @(
     "qwen3:14b",
     "gpt-oss:20b",
     "qwen2.5-coder:14b",
-    "llava:13b"
+    "llava:13b",
+    "jina/jina-embeddings-v2-base-de"
 )
 
 # Helper functions

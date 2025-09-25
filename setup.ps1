@@ -615,13 +615,13 @@ try {
     Clear-SetupState
     
     Write-Host ""
-    Write-Info "Sie finden das Dashboard im Browser unter http://localhost"
+    Write-Info "Sie finden das KommunalGPT-Dashboard im Browser unter http://localhost"
     Write-Host ""
-    Write-Info "compAInion (Open WebUI) selbst laeuft auf Port 3000 dieses Servers"
+    Write-Info "compAInion/Open WebUI selbst laeuft auf Port 3000 dieses Servers"
     Write-Info "bitte loggen Sie sich im Browser unter http://localhost:3000"
     Write-Info "zur Administration mit folgenden Daten ein:"
     Write-Host ""
-    Write-Success "E-Mail: hello@deepmentation.ai"
+    Write-Success "E-Mail: info@KommunalGPT.de"
     Write-Success "Passwort: CompAdmin#2025!"
 
 }

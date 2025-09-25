@@ -177,11 +177,11 @@ else
 fi
 
 ok "Setup abgeschlossen."
-echo "Sie finden das Dashboard im Browser unter http://localhost."
+echo "Sie finden das KommunalGPT-Dashboard im Browser unter http://localhost."
 echo " "
-echo "compAInion (Open WebUI) selbst läuft auf Port 3000 dieses Servers"
+echo "compAInion/Open WebUI selbst läuft auf Port 3000 dieses Servers"
 echo "bitte loggen Sie sich im Browser unter http://localhost:3000"
 echo "zur Administration mit folgenden Daten ein:"
 echo " "
-info "E-Mail: hello@deepmentation.ai"
+info "E-Mail: info@KommunalGPT.de"
 info "Passwort: CompAdmin#2025!"

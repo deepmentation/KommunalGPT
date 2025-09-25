@@ -100,7 +100,7 @@ cd KommunalGPT
 docker compose up -d
 ```
 
-Login für Administration: `admin@deepmentation.ai`
+Login für Administration: `info@KommunalGPT.de`
 
 Passwort für Administration: `CompAdmin#2025!`
 
