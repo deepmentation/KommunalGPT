@@ -384,8 +384,8 @@ try {
         Save-SetupState -CurrentStep "ollama" -Data @{ GPTName = $GPTName }
     }
 
-    # 4) Ollama pruefen/installieren
-    Write-Title "Pruefe/Installiere Ollama"
+    # 4) Ollama pruefen
+    Write-Title "Pruefe Ollama"
     
     $ollamaRunning = $false
     $ollamaType = "unknown"
@@ -447,7 +447,6 @@ try {
             Write-Success "Modelle werden in den Container geladen."
         }
     } else {
-        Write-Success "Ollama wird als Docker-Container bereitgestellt."
         Write-Success "Modelle werden nach dem Start in den Container geladen."
     }
 
@@ -476,18 +475,22 @@ try {
         
         try {
             Write-Info "Lade Docker Images... (Dies kann einige Minuten dauern)"
-            $pullResult = docker compose pull 2>&1
+            Write-Host ""
             
-            # Prüfe auf Fehler in der Ausgabe
-            if ($LASTEXITCODE -ne 0 -or $pullResult -match "error|Error|ERROR") {
-                Write-Warning "Warnung beim Laden der Docker Images:"
-                Write-Host $pullResult -ForegroundColor Yellow
+            # Führe docker compose pull direkt aus, um Live-Fortschritt zu sehen
+            docker compose pull
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host ""
+                Write-Warning "Warnung beim Laden der Docker Images (Exit Code: $LASTEXITCODE)"
                 Write-Info "Versuche trotzdem fortzufahren..."
             } else {
+                Write-Host ""
                 Write-Success "Docker Images erfolgreich geladen"
             }
         }
         catch {
+            Write-Host ""
             Write-Error "Fehler beim Laden der Docker Images: $($_.Exception.Message)"
             Write-Info "Stellen Sie sicher, dass Docker Desktop gestartet ist und Sie mit dem Internet verbunden sind."
             Write-Info "Versuche trotzdem fortzufahren..."
