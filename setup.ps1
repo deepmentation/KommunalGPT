@@ -441,7 +441,6 @@ try {
         if ($ollamaType -eq "local") {
             Write-Success "Hinweis: Das bereits lokal installierte Ollama wird verwendet."
             Write-Warning "Die Modelle werden in die lokale Ollama-Installation geladen."
-            Write-Warning "Das models.ps1 Skript wird entsprechend angepasst ausgefuehrt."
         } else {
             Write-Success "Hinweis: Das bereits als Docker-Container laufende Ollama wird verwendet."
             Write-Success "Modelle werden in den Container geladen."
@@ -470,7 +469,7 @@ try {
                 exit 1
             }
         } else {
-            Write-Success "Docker Desktop läuft bereits"
+            Write-Success "Docker Desktop laeuft bereits"
         }
         
         try {
@@ -504,7 +503,7 @@ try {
         
         # Stelle sicher, dass Docker läuft
         if (-not (Test-DockerRunning)) {
-            Write-Warning "Docker Desktop läuft nicht. Versuche zu starten..."
+            Write-Warning "Docker Desktop laeuft nicht. Versuche zu starten..."
             if (-not (Start-DockerDesktop)) {
                 Write-Error "Docker Desktop konnte nicht gestartet werden."
                 Write-Info "Bitte starten Sie Docker Desktop manuell und führen Sie das Setup erneut aus."
