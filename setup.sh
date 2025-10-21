@@ -8,13 +8,137 @@ ok()    { echo -e "✅ $*"; }
 
 echo "=== KommunalGPT Setup (Linux) ==="
 
+# Funktion: Port-Prüfung
+check_port() {
+  local port=$1
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i :"$port" >/dev/null 2>&1
+    return $?
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -tuln | grep -q ":$port "
+    return $?
+  elif command -v ss >/dev/null 2>&1; then
+    ss -tuln | grep -q ":$port "
+    return $?
+  else
+    warn "Keine Port-Prüfung möglich (lsof/netstat/ss nicht gefunden)"
+    return 1
+  fi
+}
+
+# Funktion: Alternativen Port abfragen
+ask_alternative_port() {
+  local service=$1
+  local default_port=$2
+  local new_port
+  
+  while true; do
+    read -rp "Port für $service [Vorschlag: $default_port]: " new_port
+    new_port="${new_port:-$default_port}"
+    
+    if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+      warn "Ungültiger Port. Bitte eine Zahl zwischen 1 und 65535 eingeben."
+      continue
+    fi
+    
+    if check_port "$new_port"; then
+      warn "Port $new_port ist bereits belegt. Bitte einen anderen Port wählen."
+      continue
+    fi
+    
+    # Prüfe ob Port bereits von einem anderen Service reserviert wurde
+    if [[ "$new_port" == "$OLLAMA_PORT" ]] || [[ "$new_port" == "$WEBUI_PORT" ]] || \
+       [[ "$new_port" == "$TIKA_PORT" ]] || [[ "$new_port" == "$COMPAINION_UI_PORT" ]]; then
+      warn "Port $new_port wird bereits von einem anderen Service verwendet. Bitte einen anderen Port wählen."
+      continue
+    fi
+    
+    echo "$new_port"
+    return 0
+  done
+}
+
 # 1) Name abfragen
 DEFAULT_NAME="KommunalGPT"
 read -rp "Wie soll dein GPT heißen? [${DEFAULT_NAME}]: " COMPAINION_NAME
 COMPAINION_NAME="${COMPAINION_NAME:-$DEFAULT_NAME}"
 ok "Name gesetzt: ${COMPAINION_NAME}"
 
-# 2) .env erstellen/aktualisieren
+# 2) Port-Prüfung und Konfiguration
+title "Prüfe Ports"
+
+# Lese Standard-Ports aus .env.example
+if [[ -f ".env.example" ]]; then
+  OLLAMA_PORT=$(grep "^OLLAMA_PORT=" .env.example | cut -d'=' -f2)
+  WEBUI_PORT=$(grep "^WEBUI_PORT=" .env.example | cut -d'=' -f2)
+  TIKA_PORT=$(grep "^TIKA_PORT=" .env.example | cut -d'=' -f2)
+  COMPAINION_UI_PORT=$(grep "^COMPAINION_UI_PORT=" .env.example | cut -d'=' -f2)
+else
+  warn ".env.example nicht gefunden, verwende Standard-Ports"
+  OLLAMA_PORT=11434
+  WEBUI_PORT=3000
+  TIKA_PORT=9998
+  COMPAINION_UI_PORT=80
+fi
+
+# Prüfe jeden Port
+PORTS_CHANGED=false
+
+# Spezielle Prüfung für Ollama-Port
+if check_port "$OLLAMA_PORT"; then
+  # Port ist belegt - prüfe ob es Ollama ist
+  if curl -s http://localhost:${OLLAMA_PORT}/api/version >/dev/null 2>&1; then
+    ok "Port $OLLAMA_PORT ist von Ollama belegt - wird verwendet"
+  else
+    warn "Port $OLLAMA_PORT (Ollama) ist belegt, aber nicht durch Ollama!"
+    OLLAMA_PORT=$(ask_alternative_port "Ollama" "11435")
+    PORTS_CHANGED=true
+    ok "Neuer Ollama-Port: $OLLAMA_PORT"
+  fi
+else
+  ok "Port $OLLAMA_PORT (Ollama) ist frei"
+fi
+
+if check_port "$WEBUI_PORT"; then
+  warn "Port $WEBUI_PORT (Open WebUI) ist bereits belegt!"
+  WEBUI_PORT=$(ask_alternative_port "Open WebUI" "3001")
+  PORTS_CHANGED=true
+  ok "Neuer Open WebUI-Port: $WEBUI_PORT"
+else
+  ok "Port $WEBUI_PORT (Open WebUI) ist frei"
+fi
+
+if check_port "$TIKA_PORT"; then
+  warn "Port $TIKA_PORT (Tika) ist bereits belegt!"
+  TIKA_PORT=$(ask_alternative_port "Tika" "9999")
+  PORTS_CHANGED=true
+  ok "Neuer Tika-Port: $TIKA_PORT"
+else
+  ok "Port $TIKA_PORT (Tika) ist frei"
+fi
+
+if check_port "$COMPAINION_UI_PORT"; then
+  warn "Port $COMPAINION_UI_PORT (compAInion-UI/Dashboard) ist bereits belegt!"
+  COMPAINION_UI_PORT=$(ask_alternative_port "compAInion-UI" "8080")
+  PORTS_CHANGED=true
+  ok "Neuer compAInion-UI-Port: $COMPAINION_UI_PORT"
+else
+  ok "Port $COMPAINION_UI_PORT (compAInion-UI/Dashboard) ist frei"
+fi
+
+# Aktualisiere .env.example wenn Ports geändert wurden
+if [[ "$PORTS_CHANGED" == "true" ]] && [[ -f ".env.example" ]]; then
+  info "Aktualisiere .env.example mit neuen Ports..."
+  cp .env.example .env.example.bak
+  sed -i.tmp "s|^OLLAMA_PORT=.*|OLLAMA_PORT=$OLLAMA_PORT|g" .env.example
+  sed -i.tmp "s|^WEBUI_PORT=.*|WEBUI_PORT=$WEBUI_PORT|g" .env.example
+  sed -i.tmp "s|^TIKA_PORT=.*|TIKA_PORT=$TIKA_PORT|g" .env.example
+  sed -i.tmp "s|^COMPAINION_UI_PORT=.*|COMPAINION_UI_PORT=$COMPAINION_UI_PORT|g" .env.example
+  rm -f .env.example.tmp
+  ok ".env.example aktualisiert (Backup: .env.example.bak)"
+fi
+
+# 3) .env erstellen/aktualisieren
 title "Konfiguriere .env"
 if [[ ! -f ".env" && -f ".env.example" ]]; then
   cp .env.example .env
@@ -26,16 +150,16 @@ if grep -q "^COMPAINION_NAME=" .env; then
 else
   echo "COMPAINION_NAME='${COMPAINION_NAME}'" >> .env
 fi
-# OLLAMA_BASE_URL setzen/ersetzen
+# OLLAMA_BASE_URL setzen/ersetzen (mit dynamischem Port)
 if grep -q "^OLLAMA_BASE_URL=" .env; then
-  sed -i.bak "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL='http://localhost:11434'|g" .env
+  sed -i.bak "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL='http://localhost:${OLLAMA_PORT}'|g" .env
 else
-  echo "OLLAMA_BASE_URL='http://localhost:11434'" >> .env
+  echo "OLLAMA_BASE_URL='http://localhost:${OLLAMA_PORT}'" >> .env
 fi
 rm -f .env.bak
 ok ".env aktualisiert"
 
-# 3) Docker installieren/prüfen
+# 4) Docker installieren/prüfen
 title "Prüfe/Installiere Docker"
 OS="$(uname -s)"
 if ! command -v docker >/dev/null 2>&1; then
@@ -80,14 +204,14 @@ else
   ok "Docker Version: $(docker --version)"
 fi
 
-# 4) Ollama installieren/prüfen
+# 5) Ollama installieren/prüfen
 title "Prüfe/Installiere Ollama"
 
 # Prüfe ob Ollama API bereits erreichbar ist
 OLLAMA_RUNNING=false
-if curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+if curl -s http://localhost:${OLLAMA_PORT}/api/version >/dev/null 2>&1; then
   OLLAMA_RUNNING=true
-  OLLAMA_VERSION=$(curl -s http://localhost:11434/api/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unbekannt")
+  OLLAMA_VERSION=$(curl -s http://localhost:${OLLAMA_PORT}/api/version 2>/dev/null | grep -o '"version":"[^"]*"' | cut -d'"' -f4 || echo "unbekannt")
   ok "Ollama API ist bereits erreichbar (Version: $OLLAMA_VERSION)"
   
   # Prüfe ob es ein Docker-Container ist
@@ -108,7 +232,7 @@ elif command -v ollama >/dev/null 2>&1; then
     sleep 5
   fi
   
-  if curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
+  if curl -s http://localhost:${OLLAMA_PORT}/api/version >/dev/null 2>&1; then
     OLLAMA_RUNNING=true
     OLLAMA_TYPE="local"
     ok "Ollama erfolgreich gestartet"
@@ -153,18 +277,19 @@ if [[ "$OLLAMA_TYPE" == "local" ]]; then
   fi
 fi
 
-# 5) Docker Compose Pull
+# 6) Docker Compose Pull
 title "Pull Docker-Images"
 info "Lade Docker Images..."
 docker compose pull
 
-# 6) Initialstart nur OWUI (Ressourcen anlegen)
+# 7) Initialstart nur OWUI (Ressourcen anlegen)
 title "Initialer Start (Ressourcen anlegen)"
+warn "Es wird nun eventuell das Passwort des Systemadministrators abgefragt. Dieses wird nicht gespeichert, sondern nur zum Kopieren der System-Datenbank benötigt."
 docker compose up -d kommunal-gpt
 sleep 20
 docker compose down
 
-# 7) DB/Statics kopieren
+# 8) DB/Statics kopieren
 title "Standard-Datenbank einsetzen"
 if [[ -f "master-webui.db" ]]; then
   sudo cp -f master-webui.db owui/data/webui.db
@@ -180,7 +305,7 @@ else
   warn "Keine Konfiguration gefunden – übersprungen."
 fi
 
-# 8) Gesamtsystem starten
+# 9) Gesamtsystem starten
 title "Starte System"
 if [[ "$OLLAMA_TYPE" == "local" ]]; then
   info "Starte System (ohne Ollama-Container, da lokal installiert)..."
@@ -189,7 +314,7 @@ else
 fi
 docker compose up -d
 
-# 9) Optional: Modelle laden
+# 10) Optional: Modelle laden
 warn "Die Modelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
 if [[ -x "./models.sh" ]]; then
   chmod +x models.sh
@@ -199,11 +324,17 @@ else
 fi
 
 ok "Setup abgeschlossen."
-echo "Sie finden das KommunalGPT-Dashboard im Browser unter http://localhost."
-echo " "
-echo "compAInion/Open WebUI selbst läuft auf Port 3000 dieses Servers"
-echo "bitte loggen Sie sich im Browser unter http://localhost:3000"
-echo "zur Administration mit folgenden Daten ein:"
-echo " "
-info "E-Mail: info@KommunalGPT.de"
-info "Passwort: CompAdmin#2025!"
+echo ""
+echo "=========================================="
+echo "  KommunalGPT ist bereit!"
+echo "=========================================="
+echo ""
+echo "📊 KommunalGPT-Dashboard:"
+echo "   http://localhost:${COMPAINION_UI_PORT}"
+echo ""
+echo "🤖 compAInion/Open WebUI (Administration):"
+echo "   http://localhost:${WEBUI_PORT}"
+echo "   E-Mail: info@KommunalGPT.de"
+echo "   Passwort: CompAdmin#2025!"
+echo ""
+echo "=========================================="

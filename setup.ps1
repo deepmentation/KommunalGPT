@@ -49,6 +49,66 @@ function Test-CommandExists {
     }
 }
 
+# Port-Prüfungs-Funktionen
+function Test-PortInUse {
+    param([int]$Port)
+    try {
+        $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+        return ($connections.Count -gt 0)
+    }
+    catch {
+        # Fallback für ältere PowerShell-Versionen
+        try {
+            $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $Port)
+            $listener.Start()
+            $listener.Stop()
+            return $false
+        }
+        catch {
+            return $true
+        }
+    }
+}
+
+function Get-AlternativePort {
+    param(
+        [string]$ServiceName,
+        [int]$SuggestedPort
+    )
+    
+    while ($true) {
+        $newPort = Read-Host "Port fuer $ServiceName [Vorschlag: $SuggestedPort]"
+        if ([string]::IsNullOrEmpty($newPort)) {
+            $newPort = $SuggestedPort
+        }
+        
+        try {
+            $portNum = [int]$newPort
+            if ($portNum -lt 1 -or $portNum -gt 65535) {
+                Write-Warning "Ungueltiger Port. Bitte eine Zahl zwischen 1 und 65535 eingeben."
+                continue
+            }
+            
+            if (Test-PortInUse -Port $portNum) {
+                Write-Warning "Port $portNum ist bereits belegt. Bitte einen anderen Port waehlen."
+                continue
+            }
+            
+            # Prüfe ob Port bereits von einem anderen Service reserviert wurde
+            if ($portNum -eq $script:OllamaPort -or $portNum -eq $script:WebuiPort -or `
+                $portNum -eq $script:TikaPort -or $portNum -eq $script:CompainionUiPort) {
+                Write-Warning "Port $portNum wird bereits von einem anderen Service verwendet. Bitte einen anderen Port waehlen."
+                continue
+            }
+            
+            return $portNum
+        }
+        catch {
+            Write-Warning "Ungueltige Eingabe. Bitte eine gueltige Portnummer eingeben."
+        }
+    }
+}
+
 # State Management Functions
 function Save-SetupState {
     param(
@@ -280,12 +340,112 @@ try {
         
         $script:GPTName = $GPTName
         Write-Success "Name gesetzt: $GPTName"
-        Save-SetupState -CurrentStep "env" -Data @{ GPTName = $GPTName }
+        Save-SetupState -CurrentStep "ports" -Data @{ GPTName = $GPTName }
     }
 
-    # 2) .env erstellen/aktualisieren
-    if ($startStep -eq "config" -or $startStep -eq "env") {
+    # 2) Port-Prüfung und Konfiguration
+    if ($startStep -eq "config" -or $startStep -eq "ports") {
+        Write-Title "Pruefe Ports"
+        
+        # Lese Standard-Ports aus .env.example
+        if (Test-Path ".env.example") {
+            $envExample = Get-Content ".env.example"
+            $script:OllamaPort = ($envExample | Select-String "^OLLAMA_PORT=" | ForEach-Object { $_ -replace "^OLLAMA_PORT=", "" }) -as [int]
+            $script:WebuiPort = ($envExample | Select-String "^WEBUI_PORT=" | ForEach-Object { $_ -replace "^WEBUI_PORT=", "" }) -as [int]
+            $script:TikaPort = ($envExample | Select-String "^TIKA_PORT=" | ForEach-Object { $_ -replace "^TIKA_PORT=", "" }) -as [int]
+            $script:CompainionUiPort = ($envExample | Select-String "^COMPAINION_UI_PORT=" | ForEach-Object { $_ -replace "^COMPAINION_UI_PORT=", "" }) -as [int]
+        } else {
+            Write-Warning ".env.example nicht gefunden, verwende Standard-Ports"
+            $script:OllamaPort = 11434
+            $script:WebuiPort = 3000
+            $script:TikaPort = 9998
+            $script:CompainionUiPort = 80
+        }
+        
+        # Prüfe jeden Port
+        $portsChanged = $false
+        
+        # Spezielle Prüfung für Ollama-Port
+        if (Test-PortInUse -Port $OllamaPort) {
+            # Port ist belegt - prüfe ob es Ollama ist
+            try {
+                $response = Invoke-RestMethod -Uri "http://localhost:$OllamaPort/api/version" -Method Get -TimeoutSec 5 -ErrorAction Stop
+                Write-Success "Port $OllamaPort ist von Ollama belegt - wird verwendet"
+            }
+            catch {
+                Write-Warning "Port $OllamaPort (Ollama) ist belegt, aber nicht durch Ollama!"
+                $script:OllamaPort = Get-AlternativePort -ServiceName "Ollama" -SuggestedPort 11435
+                $portsChanged = $true
+                Write-Success "Neuer Ollama-Port: $OllamaPort"
+            }
+        } else {
+            Write-Success "Port $OllamaPort (Ollama) ist frei"
+        }
+        
+        if (Test-PortInUse -Port $WebuiPort) {
+            Write-Warning "Port $WebuiPort (Open WebUI) ist bereits belegt!"
+            $script:WebuiPort = Get-AlternativePort -ServiceName "Open WebUI" -SuggestedPort 3001
+            $portsChanged = $true
+            Write-Success "Neuer Open WebUI-Port: $WebuiPort"
+        } else {
+            Write-Success "Port $WebuiPort (Open WebUI) ist frei"
+        }
+        
+        if (Test-PortInUse -Port $TikaPort) {
+            Write-Warning "Port $TikaPort (Tika) ist bereits belegt!"
+            $script:TikaPort = Get-AlternativePort -ServiceName "Tika" -SuggestedPort 9999
+            $portsChanged = $true
+            Write-Success "Neuer Tika-Port: $TikaPort"
+        } else {
+            Write-Success "Port $TikaPort (Tika) ist frei"
+        }
+        
+        if (Test-PortInUse -Port $CompainionUiPort) {
+            Write-Warning "Port $CompainionUiPort (compAInion-UI/Dashboard) ist bereits belegt!"
+            $script:CompainionUiPort = Get-AlternativePort -ServiceName "compAInion-UI" -SuggestedPort 8080
+            $portsChanged = $true
+            Write-Success "Neuer compAInion-UI-Port: $CompainionUiPort"
+        } else {
+            Write-Success "Port $CompainionUiPort (compAInion-UI/Dashboard) ist frei"
+        }
+        
+        # Aktualisiere .env.example wenn Ports geändert wurden
+        if ($portsChanged -and (Test-Path ".env.example")) {
+            Write-Info "Aktualisiere .env.example mit neuen Ports..."
+            Copy-Item ".env.example" ".env.example.bak" -Force
+            
+            $envContent = Get-Content ".env.example"
+            $envContent = $envContent -replace "^OLLAMA_PORT=.*", "OLLAMA_PORT=$OllamaPort"
+            $envContent = $envContent -replace "^WEBUI_PORT=.*", "WEBUI_PORT=$WebuiPort"
+            $envContent = $envContent -replace "^TIKA_PORT=.*", "TIKA_PORT=$TikaPort"
+            $envContent = $envContent -replace "^COMPAINION_UI_PORT=.*", "COMPAINION_UI_PORT=$CompainionUiPort"
+            $envContent | Set-Content ".env.example"
+            
+            Write-Success ".env.example aktualisiert (Backup: .env.example.bak)"
+        }
+        
+        Save-SetupState -CurrentStep "env" -Data @{ 
+            GPTName = $GPTName
+            OllamaPort = $OllamaPort
+            WebuiPort = $WebuiPort
+            TikaPort = $TikaPort
+            CompainionUiPort = $CompainionUiPort
+        }
+    }
+
+    # 3) .env erstellen/aktualisieren
+    if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env") {
         Write-Title "Konfiguriere .env"
+        
+        # Stelle sicher, dass Port-Variablen gesetzt sind
+        if (-not $script:OllamaPort) {
+            if (Test-Path ".env.example") {
+                $envExample = Get-Content ".env.example"
+                $script:OllamaPort = ($envExample | Select-String "^OLLAMA_PORT=" | ForEach-Object { $_ -replace "^OLLAMA_PORT=", "" }) -as [int]
+            } else {
+                $script:OllamaPort = 11434
+            }
+        }
         
         if (-not (Test-Path ".env")) {
             if (Test-Path ".env.example") {
@@ -311,7 +471,7 @@ try {
                 $GPTNameSet = $true
             }
             elseif ($envContent[$i] -match "^OLLAMA_BASE_URL=") {
-                $envContent[$i] = "OLLAMA_BASE_URL='http://localhost:11434'"
+                $envContent[$i] = "OLLAMA_BASE_URL='http://localhost:$OllamaPort'"
                 $ollamaUrlSet = $true
             }
         }
@@ -320,7 +480,7 @@ try {
             $envContent += "COMPAINION_NAME='$GPTName'"
         }
         if (-not $ollamaUrlSet) {
-            $envContent += "OLLAMA_BASE_URL='http://localhost:11434'"
+            $envContent += "OLLAMA_BASE_URL='http://localhost:$OllamaPort'"
         }
         
         $envContent | Set-Content ".env"
@@ -328,8 +488,8 @@ try {
         Save-SetupState -CurrentStep "docker" -Data @{ GPTName = $GPTName }
     }
 
-    # 3) Docker pruefen/installieren
-    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker") {
+    # 4) Docker pruefen/installieren
+    if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env" -or $startStep -eq "docker") {
         Write-Title "Pruefe/Installiere Docker"
         
         # Versuche Docker-Pfad zu initialisieren
@@ -384,7 +544,7 @@ try {
         Save-SetupState -CurrentStep "ollama" -Data @{ GPTName = $GPTName }
     }
 
-    # 4) Ollama pruefen
+    # 5) Ollama pruefen
     Write-Title "Pruefe Ollama"
     
     $ollamaRunning = $false
@@ -475,8 +635,8 @@ try {
         }
     }
 
-    # 5) Pull Images
-    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama") {
+    # 6) Pull Images
+    if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama") {
         Write-Title "Pull Docker-Images"
         
         # Stelle sicher, dass Docker verfügbar und läuft
@@ -523,9 +683,10 @@ try {
         Save-SetupState -CurrentStep "init" -Data @{ GPTName = $GPTName }
     }
 
-    # 6) Initialstart nur Frontend
-    if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama" -or $startStep -eq "init") {
+    # 7) Initialstart nur Frontend
+    if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama" -or $startStep -eq "init") {
         Write-Title "Initialer Start (Ressourcen anlegen)"
+        Write-Warning "Es wird nun eventuell das Passwort des Systemadministrators abgefragt. Dieses wird nicht gespeichert, sondern nur zum Kopieren der System-Datenbank benötigt."
         
         # Stelle sicher, dass Docker läuft
         if (-not (Test-DockerRunning)) {
@@ -562,7 +723,7 @@ try {
         Save-SetupState -CurrentStep "files" -Data @{ GPTName = $GPTName }
     }
 
-    # 7) DB/Statics kopieren
+    # 8) DB/Statics kopieren
     Write-Title "Standard-Datenbank einsetzen"
     
     # Verzeichnisse erstellen
@@ -594,7 +755,7 @@ try {
         Write-Warning "static-Verzeichnis nicht gefunden - uebersprungen."
     }
 
-    # 8) System starten
+    # 9) System starten
     Write-Title "Starte System"
     
     # Stelle sicher, dass Docker läuft
@@ -621,7 +782,7 @@ try {
         throw
     }
 
-    # 9) Optional: Modelle laden
+    # 10) Optional: Modelle laden
     Write-Title "Modelle laden"
     Write-Warning "Die Sprachmodelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
     
@@ -648,14 +809,27 @@ try {
     Clear-SetupState
     
     Write-Host ""
-    Write-Info "Sie finden das KommunalGPT-Dashboard im Browser unter http://localhost"
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "  KommunalGPT ist bereit!" -ForegroundColor Green
+    Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Info "compAInion/Open WebUI selbst laeuft auf Port 3000 dieses Servers"
-    Write-Info "bitte loggen Sie sich im Browser unter http://localhost:3000"
-    Write-Info "zur Administration mit folgenden Daten ein:"
+    Write-Host "📊 KommunalGPT-Dashboard:" -ForegroundColor Yellow
+    Write-Host "   http://localhost:$CompainionUiPort" -ForegroundColor White
     Write-Host ""
-    Write-Success "E-Mail: info@KommunalGPT.de"
-    Write-Success "Passwort: CompAdmin#2025!"
+    Write-Host "🤖 compAInion/Open WebUI (Administration):" -ForegroundColor Yellow
+    Write-Host "   http://localhost:$WebuiPort" -ForegroundColor White
+    Write-Host "   E-Mail: info@KommunalGPT.de" -ForegroundColor Gray
+    Write-Host "   Passwort: CompAdmin#2025!" -ForegroundColor Gray
+    Write-Host ""
+    if ($ollamaType -eq "docker") {
+        Write-Host "🧠 Ollama API:" -ForegroundColor Yellow
+        Write-Host "   http://localhost:$OllamaPort" -ForegroundColor White
+        Write-Host ""
+    }
+    Write-Host "📄 Apache Tika (Dokumentenverarbeitung):" -ForegroundColor Yellow
+    Write-Host "   http://localhost:$TikaPort" -ForegroundColor White
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Cyan
 
 }
 catch {
