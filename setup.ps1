@@ -449,6 +449,32 @@ try {
         Write-Success "Modelle werden nach dem Start in den Container geladen."
     }
 
+    # Ollama-Section in docker-compose.yml auskommentieren wenn lokal installiert
+    if ($ollamaType -eq "local") {
+        Write-Info "Kommentiere Ollama-Container in docker-compose.yml aus..."
+        if (Test-Path "docker-compose.yml") {
+            # Backup erstellen
+            Copy-Item "docker-compose.yml" "docker-compose.yml.bak" -Force
+            
+            # Ollama-Section auskommentieren (Zeilen 6-17)
+            $content = Get-Content "docker-compose.yml"
+            $newContent = @()
+            
+            for ($i = 0; $i -lt $content.Length; $i++) {
+                if ($i -ge 5 -and $i -le 16) {
+                    # Zeilen 6-17 (Array ist 0-basiert)
+                    $newContent += "# $($content[$i])"
+                } else {
+                    $newContent += $content[$i]
+                }
+            }
+            
+            $newContent | Set-Content "docker-compose.yml"
+            Write-Success "Ollama-Container in docker-compose.yml auskommentiert"
+            Write-Info "Backup gespeichert als: docker-compose.yml.bak"
+        }
+    }
+
     # 5) Pull Images
     if ($startStep -eq "config" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama") {
         Write-Title "Pull Docker-Images"
@@ -582,6 +608,11 @@ try {
     }
     
     try {
+        if ($ollamaType -eq "local") {
+            Write-Info "Starte System (ohne Ollama-Container, da lokal installiert)..."
+        } else {
+            Write-Info "Starte System mit Ollama-Container..."
+        }
         docker compose up -d
         Write-Success "System erfolgreich gestartet"
     }

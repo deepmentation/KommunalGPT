@@ -137,8 +137,25 @@ else
   ok "Modelle werden nach dem Start in den Container geladen."
 fi
 
+# Ollama-Section in docker-compose.yml auskommentieren wenn lokal installiert
+if [[ "$OLLAMA_TYPE" == "local" ]]; then
+  info "Kommentiere Ollama-Container in docker-compose.yml aus..."
+  if [[ -f "docker-compose.yml" ]]; then
+    # Backup erstellen
+    cp docker-compose.yml docker-compose.yml.bak
+    
+    # Ollama-Section auskommentieren (Zeilen 6-17)
+    sed -i.tmp '6,17s/^/# /' docker-compose.yml
+    rm -f docker-compose.yml.tmp
+    
+    ok "Ollama-Container in docker-compose.yml auskommentiert"
+    info "Backup gespeichert als: docker-compose.yml.bak"
+  fi
+fi
+
 # 5) Docker Compose Pull
 title "Pull Docker-Images"
+info "Lade Docker Images..."
 docker compose pull
 
 # 6) Initialstart nur OWUI (Ressourcen anlegen)
@@ -165,6 +182,11 @@ fi
 
 # 8) Gesamtsystem starten
 title "Starte System"
+if [[ "$OLLAMA_TYPE" == "local" ]]; then
+  info "Starte System (ohne Ollama-Container, da lokal installiert)..."
+else
+  info "Starte System mit Ollama-Container..."
+fi
 docker compose up -d
 
 # 9) Optional: Modelle laden
