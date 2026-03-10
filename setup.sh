@@ -118,12 +118,12 @@ else
 fi
 
 if check_port "$COMPAINION_UI_PORT"; then
-  warn "Port $COMPAINION_UI_PORT (compAInion-UI/Dashboard) ist bereits belegt!"
-  COMPAINION_UI_PORT=$(ask_alternative_port "compAInion-UI" "8080")
+  warn "Port $COMPAINION_UI_PORT (KommunalGPT-Dashboard) ist bereits belegt!"
+  COMPAINION_UI_PORT=$(ask_alternative_port "KommunalGPT-Dashboard" "8080")
   PORTS_CHANGED=true
-  ok "Neuer compAInion-UI-Port: $COMPAINION_UI_PORT"
+  ok "Neuer KommunalGPT-Dashboard-Port: $COMPAINION_UI_PORT"
 else
-  ok "Port $COMPAINION_UI_PORT (compAInion-UI/Dashboard) ist frei"
+  ok "Port $COMPAINION_UI_PORT (KommunalGPT-Dashboard) ist frei"
 fi
 
 # Aktualisiere .env.example wenn Ports geändert wurden
@@ -329,10 +329,13 @@ echo "=========================================="
 echo "  KommunalGPT ist bereit!"
 echo "=========================================="
 echo ""
-echo "📊 KommunalGPT-Dashboard:"
+echo "📊 KommunalGPT-Dashboard (Startseite fuer Nutzer):"
 echo "   http://localhost:${COMPAINION_UI_PORT}"
 echo ""
-echo "🤖 compAInion/Open WebUI (Administration):"
+echo "🔧 KommunalGPT-Dashboard Einstellungen:"
+echo "   Admin-Token: $(grep '^COMPAINION_UI_ADMIN_TOKEN=' .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo 'CompAdmin#2025!')"
+echo ""
+echo "🤖 Open WebUI (Administration):"
 echo "   http://localhost:${WEBUI_PORT}"
 echo "   E-Mail: info@KommunalGPT.de"
 echo "   Passwort: CompAdmin#2025!"

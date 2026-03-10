@@ -1,4 +1,4 @@
-# KommunalGPT powered by compAInion
+# KommunalGPT
 
 KommunalGPT ist Ihr lokaler KI-Assistent für tägliche Arbeiten im Kommunalbereich.
 
@@ -84,7 +84,7 @@ Nach dem Neustart wechseln Sie erneut in das Verzeichnis KommunalGPT und führen
 - Download der für KommunalGPT notwendigen Sprachmodelle in Ollama
 - KommunalGPT Nutzeroberfläche mit Chat-Funktion und Einstellungen für Administratoren, basierend auf Open-WebUI (in einem Docker-Container)
 - Apache Tika als Dokumentenverarbeitung (in einem Docker-Container)
-- compAInion-UI als Frontend zur leichteren Nutzung (in einem Docker-Container)
+- KommunalGPT-Dashboard als vereinfachtes Frontend für Endnutzer (in einem Docker-Container)
 
 ---
 
@@ -140,7 +140,7 @@ Eingesetzte Komponenten:
 - Open WebUI
 - Ollama
 - Apache Tika
-- compAInion-UI
+- KommunalGPT-Dashboard (basierend auf compAInion-UI by deepmentation)
 
 ## Nutzungsbedingungen
 

@@ -401,12 +401,12 @@ try {
         }
         
         if (Test-PortInUse -Port $CompainionUiPort) {
-            Write-Warning "Port $CompainionUiPort (compAInion-UI/Dashboard) ist bereits belegt!"
-            $script:CompainionUiPort = Get-AlternativePort -ServiceName "compAInion-UI" -SuggestedPort 8080
+            Write-Warning "Port $CompainionUiPort (KommunalGPT-Dashboard) ist bereits belegt!"
+            $script:CompainionUiPort = Get-AlternativePort -ServiceName "KommunalGPT-Dashboard" -SuggestedPort 8080
             $portsChanged = $true
-            Write-Success "Neuer compAInion-UI-Port: $CompainionUiPort"
+            Write-Success "Neuer KommunalGPT-Dashboard-Port: $CompainionUiPort"
         } else {
-            Write-Success "Port $CompainionUiPort (compAInion-UI/Dashboard) ist frei"
+            Write-Success "Port $CompainionUiPort (KommunalGPT-Dashboard) ist frei"
         }
         
         # Aktualisiere .env.example wenn Ports geändert wurden
@@ -813,10 +813,15 @@ try {
     Write-Host "  KommunalGPT ist bereit!" -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📊 KommunalGPT-Dashboard:" -ForegroundColor Yellow
+    Write-Host "📊 KommunalGPT-Dashboard (Startseite fuer Nutzer):" -ForegroundColor Yellow
     Write-Host "   http://localhost:$CompainionUiPort" -ForegroundColor White
     Write-Host ""
-    Write-Host "🤖 compAInion/Open WebUI (Administration):" -ForegroundColor Yellow
+    Write-Host "🔧 KommunalGPT-Dashboard Einstellungen:" -ForegroundColor Yellow
+    $adminToken = (Get-Content ".env" -ErrorAction SilentlyContinue | Select-String "^COMPAINION_UI_ADMIN_TOKEN=" | ForEach-Object { $_ -replace '^COMPAINION_UI_ADMIN_TOKEN=', '' -replace '"', '' })
+    if (-not $adminToken) { $adminToken = "CompAdmin#2025!" }
+    Write-Host "   Admin-Token: $adminToken" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "🤖 Open WebUI (Administration):" -ForegroundColor Yellow
     Write-Host "   http://localhost:$WebuiPort" -ForegroundColor White
     Write-Host "   E-Mail: info@KommunalGPT.de" -ForegroundColor Gray
     Write-Host "   Passwort: CompAdmin#2025!" -ForegroundColor Gray

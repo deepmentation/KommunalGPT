@@ -37,9 +37,9 @@ services:
       - USE_CUDA_DOCKER=${USE_CUDA_DOCKER}
       - ENABLE_FOLLOW_UP_GENERATION=${ENABLE_FOLLOW_UP_GENERATION}
 
-  compainion-ui:
+  dashboard:
     image: ${COMPAINION_UI_IMAGE}:${COMPAINION_UI_TAG}
-    container_name: compainion-ui
+    container_name: kommunalgpt-dashboard
     networks:
       - kommunal-gpt-network
     ports:
@@ -52,6 +52,7 @@ services:
       - COMPAINION_UI_ADMIN_TOKEN=${COMPAINION_UI_ADMIN_TOKEN}
       - COMPAINION_NAME=${COMPAINION_NAME}
       - COMPAINION_DEFAULT_URL=${COMPAINION_DEFAULT_URL}
+      - KOMMUNALGPT_UI=${KOMMUNALGPT_UI:-true}
     restart: unless-stopped
     
   tika:
