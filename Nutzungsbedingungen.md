@@ -65,7 +65,7 @@ Web: https://KommunalGPT.de
 
 deepmentation UG (haftungsbeschränkt)
 Hans-Poeche-Str. 8
-04107 Leipzig
+04103 Leipzig
 Deutschland
 https://deepmentation.ai
 hello@deepmentation.ai
