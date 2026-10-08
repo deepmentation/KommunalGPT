@@ -3,7 +3,10 @@ networks:
     driver: bridge
 
 services:
+  # Wird nur gestartet, wenn das Profil "ollama" aktiv ist (COMPOSE_PROFILES=ollama in der .env).
+  # Das Setup aktiviert es genau dann, wenn auf dem Host kein lokales Ollama gefunden wurde.
   ollama:
+    profiles: ["ollama"]
     volumes:
       - ./ollama:/root/.ollama
     container_name: ollama
@@ -15,7 +18,7 @@ services:
     tty: true
     restart: unless-stopped
     image: ${OLLAMA_IMAGE}:${OLLAMA_DOCKER_TAG}
-    
+
   kommunal-gpt:
     image: ${WEBUI_IMAGE}:${WEBUI_TAG}
     networks:
@@ -28,9 +31,11 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./owui/data:/app/backend/data
-      - ./owui/static:/app/build/static
     environment:
-      - CUSTOM_NAME=${COMPAINION_NAME}
+      # WEBUI_NAME ist der lizenzkonforme Weg: Open WebUI haengt bei abweichendem Namen
+      # automatisch " (Open WebUI)" an und wahrt damit die Attribution der BSD-3-Lizenz.
+      # CUSTOM_NAME wurde bewusst entfernt - es umgeht diesen Zusatz (Whitelabel-Pfad nur fuer
+      # registrierte Kunden) und laedt bei JEDEM Containerstart ungefragt von api.openwebui.com.
       - WEBUI_NAME=${COMPAINION_NAME}
       - ENABLE_SIGNUP=${ENABLE_SIGNUP}
       - DEFAULT_LOCALE=${DEFAULT_LOCALE}

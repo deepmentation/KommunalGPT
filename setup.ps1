@@ -109,6 +109,49 @@ function Get-AlternativePort {
     }
 }
 
+# .env-Hilfsfunktionen
+# Schreibt immer in die .env, nie in die versionierte Vorlage .env.example.
+function Set-EnvValue {
+    param([string]$Key, [string]$Value)
+    if (-not (Test-Path ".env")) { New-Item -Path ".env" -ItemType File | Out-Null }
+    $lines = @(Get-Content ".env")
+    $found = $false
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match "^$([regex]::Escape($Key))=") {
+            $lines[$i] = "$Key=$Value"
+            $found = $true
+        }
+    }
+    if (-not $found) { $lines += "$Key=$Value" }
+    $lines | Set-Content ".env"
+}
+
+function Get-EnvValue {
+    param([string]$Key, [string]$File = ".env")
+    if (-not (Test-Path $File)) { return "" }
+    $line = Get-Content $File | Where-Object { $_ -match "^$([regex]::Escape($Key))=" } | Select-Object -First 1
+    if (-not $line) { return "" }
+    return ($line -replace "^$([regex]::Escape($Key))=", "").Trim("'", '"')
+}
+
+# Liest die Ports aus der .env in die Script-Variablen (mit Standardwerten).
+# Wird auch beim Fortsetzen eines unterbrochenen Setups benoetigt.
+function Import-PortsFromEnv {
+    $p = Get-EnvValue "OLLAMA_PORT";        $script:OllamaPort       = if ($p) { [int]$p } else { 11434 }
+    $p = Get-EnvValue "WEBUI_PORT";         $script:WebuiPort        = if ($p) { [int]$p } else { 3000 }
+    $p = Get-EnvValue "TIKA_PORT";          $script:TikaPort         = if ($p) { [int]$p } else { 9998 }
+    $p = Get-EnvValue "COMPAINION_UI_PORT"; $script:CompainionUiPort = if ($p) { [int]$p } else { 8080 }
+}
+
+# Prueft, ob ein lokal laufendes Ollama aus einem Docker-Container erreichbar ist.
+# Open WebUI spricht Ollama als http://host.docker.internal:11434 an. Lauscht Ollama nur auf
+# 127.0.0.1, sieht Open WebUI keine Modelle - das faellt sonst erst dem ersten Nutzer auf.
+function Test-OllamaFromContainer {
+    param([int]$Port = 11434)
+    $null = docker run --rm --add-host=host.docker.internal:host-gateway curlimages/curl:latest -s --max-time 10 "http://host.docker.internal:$Port/api/version" 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
 # State Management Functions
 function Save-SetupState {
     param(
@@ -347,21 +390,22 @@ try {
     if ($startStep -eq "config" -or $startStep -eq "ports") {
         Write-Title "Pruefe Ports"
         
-        # Lese Standard-Ports aus .env.example
-        if (Test-Path ".env.example") {
-            $envExample = Get-Content ".env.example"
-            $script:OllamaPort = ($envExample | Select-String "^OLLAMA_PORT=" | ForEach-Object { $_ -replace "^OLLAMA_PORT=", "" }) -as [int]
-            $script:WebuiPort = ($envExample | Select-String "^WEBUI_PORT=" | ForEach-Object { $_ -replace "^WEBUI_PORT=", "" }) -as [int]
-            $script:TikaPort = ($envExample | Select-String "^TIKA_PORT=" | ForEach-Object { $_ -replace "^TIKA_PORT=", "" }) -as [int]
-            $script:CompainionUiPort = ($envExample | Select-String "^COMPAINION_UI_PORT=" | ForEach-Object { $_ -replace "^COMPAINION_UI_PORT=", "" }) -as [int]
+        # .env anlegen, bevor Ports geprueft werden - die Ports landen direkt dort
+        if (-not (Test-Path ".env")) {
+            if (Test-Path ".env.example") {
+                Copy-Item ".env.example" ".env"
+                Write-Success ".env aus .env.example erstellt"
+            } else {
+                New-Item -Path ".env" -ItemType File | Out-Null
+                Write-Warning ".env.example nicht gefunden - leere .env angelegt"
+            }
         } else {
-            Write-Warning ".env.example nicht gefunden, verwende Standard-Ports"
-            $script:OllamaPort = 11434
-            $script:WebuiPort = 3000
-            $script:TikaPort = 9998
-            $script:CompainionUiPort = 80
+            Write-Success "Bestehende .env wird weiterverwendet"
         }
-        
+
+        # Aktuelle Ports aus der .env lesen (nicht aus der Vorlage .env.example)
+        Import-PortsFromEnv
+
         # Prüfe jeden Port
         $portsChanged = $false
         
@@ -373,10 +417,12 @@ try {
                 Write-Success "Port $OllamaPort ist von Ollama belegt - wird verwendet"
             }
             catch {
-                Write-Warning "Port $OllamaPort (Ollama) ist belegt, aber nicht durch Ollama!"
-                $script:OllamaPort = Get-AlternativePort -ServiceName "Ollama" -SuggestedPort 11435
-                $portsChanged = $true
-                Write-Success "Neuer Ollama-Port: $OllamaPort"
+                # Open WebUI spricht Ollama laut mitgelieferter Datenbank fest ueber Port 11434 an.
+                # Ein Ausweichen auf einen anderen Port wuerde die Anbindung lautlos zerstoeren.
+                Write-Warning "Port $OllamaPort wird von einem anderen Dienst belegt - nicht von Ollama."
+                Write-Warning "KommunalGPT benoetigt diesen Port zwingend fuer die Ollama-Anbindung."
+                Write-Warning "Bitte geben Sie Port $OllamaPort frei und starten Sie das Setup erneut."
+                exit 1
             }
         } else {
             Write-Success "Port $OllamaPort (Ollama) ist frei"
@@ -409,21 +455,13 @@ try {
             Write-Success "Port $CompainionUiPort (KommunalGPT-Dashboard) ist frei"
         }
         
-        # Aktualisiere .env.example wenn Ports geändert wurden
-        if ($portsChanged -and (Test-Path ".env.example")) {
-            Write-Info "Aktualisiere .env.example mit neuen Ports..."
-            Copy-Item ".env.example" ".env.example.bak" -Force
-            
-            $envContent = Get-Content ".env.example"
-            $envContent = $envContent -replace "^OLLAMA_PORT=.*", "OLLAMA_PORT=$OllamaPort"
-            $envContent = $envContent -replace "^WEBUI_PORT=.*", "WEBUI_PORT=$WebuiPort"
-            $envContent = $envContent -replace "^TIKA_PORT=.*", "TIKA_PORT=$TikaPort"
-            $envContent = $envContent -replace "^COMPAINION_UI_PORT=.*", "COMPAINION_UI_PORT=$CompainionUiPort"
-            $envContent | Set-Content ".env.example"
-            
-            Write-Success ".env.example aktualisiert (Backup: .env.example.bak)"
-        }
-        
+        # Ports in die .env schreiben (NICHT in die versionierte Vorlage .env.example)
+        if ($portsChanged) { Write-Info "Uebernehme neue Ports in die .env..." }
+        Set-EnvValue "OLLAMA_PORT" $OllamaPort
+        Set-EnvValue "WEBUI_PORT" $WebuiPort
+        Set-EnvValue "TIKA_PORT" $TikaPort
+        Set-EnvValue "COMPAINION_UI_PORT" $CompainionUiPort
+
         Save-SetupState -CurrentStep "env" -Data @{ 
             GPTName = $GPTName
             OllamaPort = $OllamaPort
@@ -437,16 +475,6 @@ try {
     if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env") {
         Write-Title "Konfiguriere .env"
         
-        # Stelle sicher, dass Port-Variablen gesetzt sind
-        if (-not $script:OllamaPort) {
-            if (Test-Path ".env.example") {
-                $envExample = Get-Content ".env.example"
-                $script:OllamaPort = ($envExample | Select-String "^OLLAMA_PORT=" | ForEach-Object { $_ -replace "^OLLAMA_PORT=", "" }) -as [int]
-            } else {
-                $script:OllamaPort = 11434
-            }
-        }
-        
         if (-not (Test-Path ".env")) {
             if (Test-Path ".env.example") {
                 Copy-Item ".env.example" ".env"
@@ -454,36 +482,25 @@ try {
                 New-Item -Path ".env" -ItemType File | Out-Null
             }
         }
+        Import-PortsFromEnv
 
-        # .env Datei aktualisieren
-        $envContent = @()
-        if (Test-Path ".env") {
-            $envContent = Get-Content ".env"
-        }
+        Set-EnvValue "COMPAINION_NAME" "'$GPTName'"
 
-        # COMPAINION_NAME setzen/ersetzen
-        $GPTNameSet = $false
-        $ollamaUrlSet = $false
-        
-        for ($i = 0; $i -lt $envContent.Length; $i++) {
-            if ($envContent[$i] -match "^COMPAINION_NAME=") {
-                $envContent[$i] = "COMPAINION_NAME='$GPTName'"
-                $GPTNameSet = $true
-            }
-            elseif ($envContent[$i] -match "^OLLAMA_BASE_URL=") {
-                $envContent[$i] = "OLLAMA_BASE_URL='http://localhost:$OllamaPort'"
-                $ollamaUrlSet = $true
-            }
-        }
-        
-        if (-not $GPTNameSet) {
-            $envContent += "COMPAINION_NAME='$GPTName'"
-        }
-        if (-not $ollamaUrlSet) {
-            $envContent += "OLLAMA_BASE_URL='http://localhost:$OllamaPort'"
-        }
-        
-        $envContent | Set-Content ".env"
+        # Dashboard-Weiterleitung auf den tatsaechlichen Host setzen, damit der Link auch von
+        # Arbeitsplatz-Rechnern funktioniert und nicht auf deren eigenen "localhost" zeigt.
+        $defaultHost = "localhost"
+        try {
+            $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+                Where-Object { $_.InterfaceAlias -notmatch "Loopback|vEthernet|WSL|Docker" -and $_.IPAddress -notmatch "^169\.254\." } |
+                Select-Object -First 1 -ExpandProperty IPAddress
+            if ($ip) { $defaultHost = $ip }
+        } catch { }
+        $serverHost = Read-Host "Unter welchem Hostnamen/IP ist dieser Server erreichbar? [$defaultHost]"
+        if ([string]::IsNullOrEmpty($serverHost)) { $serverHost = $defaultHost }
+        Set-EnvValue "SERVER_HOST" $serverHost
+        Set-EnvValue "COMPAINION_DEFAULT_URL" ('"http://' + $serverHost + ':${WEBUI_PORT}"')
+        Write-Success "Dashboard verweist auf http://${serverHost}:$WebuiPort"
+
         Write-Success ".env aktualisiert"
         Save-SetupState -CurrentStep "docker" -Data @{ GPTName = $GPTName }
     }
@@ -609,30 +626,15 @@ try {
         Write-Success "Modelle werden nach dem Start in den Container geladen."
     }
 
-    # Ollama-Section in docker-compose.yml auskommentieren wenn lokal installiert
+    # Ollama-Container per Compose-Profil zu- oder abschalten.
+    # Frueher wurde die Ollama-Sektion ueber feste Zeilennummern auskommentiert - das zerbrach bei
+    # jeder Aenderung am Dateikopf. Das Profil "ollama" ist unabhaengig vom Dateiaufbau.
     if ($ollamaType -eq "local") {
-        Write-Info "Kommentiere Ollama-Container in docker-compose.yml aus..."
-        if (Test-Path "docker-compose.yml") {
-            # Backup erstellen
-            Copy-Item "docker-compose.yml" "docker-compose.yml.bak" -Force
-            
-            # Ollama-Section auskommentieren (Zeilen 6-17)
-            $content = Get-Content "docker-compose.yml"
-            $newContent = @()
-            
-            for ($i = 0; $i -lt $content.Length; $i++) {
-                if ($i -ge 5 -and $i -le 16) {
-                    # Zeilen 6-17 (Array ist 0-basiert)
-                    $newContent += "# $($content[$i])"
-                } else {
-                    $newContent += $content[$i]
-                }
-            }
-            
-            $newContent | Set-Content "docker-compose.yml"
-            Write-Success "Ollama-Container in docker-compose.yml auskommentiert"
-            Write-Info "Backup gespeichert als: docker-compose.yml.bak"
-        }
+        Set-EnvValue "COMPOSE_PROFILES" ""
+        Write-Success "Lokales Ollama wird verwendet - der Ollama-Container bleibt ausgeschaltet."
+    } else {
+        Set-EnvValue "COMPOSE_PROFILES" "ollama"
+        Write-Success "Ollama wird als Container bereitgestellt (Compose-Profil 'ollama' aktiv)."
     }
 
     # 6) Pull Images
@@ -686,7 +688,6 @@ try {
     # 7) Initialstart nur Frontend
     if ($startStep -eq "config" -or $startStep -eq "ports" -or $startStep -eq "env" -or $startStep -eq "docker" -or $startStep -eq "ollama" -or $startStep -eq "init") {
         Write-Title "Initialer Start (Ressourcen anlegen)"
-        Write-Warning "Es wird nun eventuell das Passwort des Systemadministrators abgefragt. Dieses wird nicht gespeichert, sondern nur zum Kopieren der System-Datenbank benötigt."
         
         # Stelle sicher, dass Docker läuft
         if (-not (Test-DockerRunning)) {
@@ -723,36 +724,28 @@ try {
         Save-SetupState -CurrentStep "files" -Data @{ GPTName = $GPTName }
     }
 
-    # 8) DB/Statics kopieren
+    # 8) Standard-Datenbank einsetzen
+    # Hinweis: Das Branding von Open WebUI wird bewusst NICHT mehr ueberschrieben. Frueher wurde
+    # static\* nach owui\static\ kopiert - das ersetzte Favicon und Splash von Open WebUI und stand
+    # im Konflikt mit dessen Branding-Klausel. Der Name bleibt ueber WEBUI_NAME erhalten.
     Write-Title "Standard-Datenbank einsetzen"
-    
-    # Verzeichnisse erstellen
+
     if (-not (Test-Path "owui\data")) {
         New-Item -Path "owui\data" -ItemType Directory -Force | Out-Null
     }
-    if (-not (Test-Path "owui\static")) {
-        New-Item -Path "owui\static" -ItemType Directory -Force | Out-Null
-    }
 
-    # Datenbank kopieren
     if (Test-Path "master-webui.db") {
-        Copy-Item "master-webui.db" "owui\data\webui.db" -Force
-        Write-Success "DB eingesetzt: owui\data\webui.db"
-    } else {
-        Write-Warning "master-webui.db nicht gefunden - uebersprungen."
-    }
-
-    # Static files kopieren
-    if (Test-Path "static") {
         try {
-            Copy-Item "static\*" "owui\static\" -Recurse -Force
-            Write-Success "Konfiguration eingespielt"
+            Copy-Item "master-webui.db" "owui\data\webui.db" -Force -ErrorAction Stop
+            Write-Success "DB eingesetzt: owui\data\webui.db"
         }
         catch {
-            Write-Warning "Fehler beim Kopieren der Static-Dateien"
+            Write-Error "Die Standard-Datenbank konnte nicht eingesetzt werden: $($_.Exception.Message)"
+            Write-Info "Open WebUI wuerde ohne die vorkonfigurierten Assistenten starten. Setup abgebrochen."
+            exit 1
         }
     } else {
-        Write-Warning "static-Verzeichnis nicht gefunden - uebersprungen."
+        Write-Warning "master-webui.db nicht gefunden - uebersprungen."
     }
 
     # 9) System starten
@@ -768,6 +761,27 @@ try {
         }
     }
     
+    # Lokales Ollama muss aus dem Container erreichbar sein
+    if ($ollamaType -eq "local") {
+        Write-Info "Pruefe Ollama-Erreichbarkeit aus dem Container..."
+        if (Test-OllamaFromContainer) {
+            Write-Success "Ollama ist aus dem Container erreichbar"
+        } else {
+            Write-Warning "Ollama laeuft lokal, ist aus dem Docker-Container aber NICHT erreichbar."
+            Write-Warning "Open WebUI wuerde dadurch ohne Modelle starten."
+            Write-Host ""
+            Write-Host "Ursache: Ollama lauscht vermutlich nur auf 127.0.0.1."
+            Write-Host "Abhilfe: Umgebungsvariable setzen und Ollama neu starten:"
+            Write-Host '  [Environment]::SetEnvironmentVariable("OLLAMA_HOST", "0.0.0.0", "User")'
+            Write-Host ""
+            $continueAnyway = Read-Host "Trotzdem fortfahren? (j/N)"
+            if ($continueAnyway -notmatch "^[JjYy]") {
+                Write-Info "Setup abgebrochen. Bitte Ollama erreichbar machen und erneut starten."
+                exit 1
+            }
+        }
+    }
+
     try {
         if ($ollamaType -eq "local") {
             Write-Info "Starte System (ohne Ollama-Container, da lokal installiert)..."
@@ -784,10 +798,11 @@ try {
 
     # 10) Optional: Modelle laden
     Write-Title "Modelle laden"
-    Write-Warning "Die Sprachmodelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
-    
-    $loadModels = Read-Host "Moechten Sie die Modelle jetzt laden? (J/n)"
-    if ([string]::IsNullOrEmpty($loadModels) -or $loadModels -match "^[JjYy]") {
+    Write-Host "Die Sprachmodelle koennen jetzt geladen werden. Das sind je nach Auswahl mehrere"
+    Write-Host "Gigabyte und kann eine Weile dauern. Sie koennen das auch spaeter mit .\models.ps1 nachholen."
+
+    $loadModels = Read-Host "Modelle jetzt laden? (j/N)"
+    if ($loadModels -match "^[JjYy]") {
         if (Test-Path "models.ps1") {
             Write-Info "Starte models.ps1..."
             & ".\models.ps1"
@@ -799,6 +814,8 @@ try {
         else {
             Write-Warning "Weder models.ps1 noch models.bat gefunden - uebersprungen."
         }
+    } else {
+        Write-Info "Modelle uebersprungen. Nachholen jederzeit mit: .\models.ps1"
     }
 
     # Setup abgeschlossen
@@ -813,26 +830,22 @@ try {
     Write-Host "  KommunalGPT ist bereit!" -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📊 KommunalGPT-Dashboard (Startseite fuer Nutzer):" -ForegroundColor Yellow
-    Write-Host "   http://localhost:$CompainionUiPort" -ForegroundColor White
+    Import-PortsFromEnv
+    $serverHost = Get-EnvValue "SERVER_HOST"
+    if (-not $serverHost) { $serverHost = "localhost" }
+    Write-Host "[Dashboard] KommunalGPT-Dashboard (Startseite fuer Nutzer):" -ForegroundColor Yellow
+    Write-Host "   http://${serverHost}:$CompainionUiPort" -ForegroundColor White
     Write-Host ""
-    Write-Host "🔧 KommunalGPT-Dashboard Einstellungen:" -ForegroundColor Yellow
-    $adminToken = (Get-Content ".env" -ErrorAction SilentlyContinue | Select-String "^COMPAINION_UI_ADMIN_TOKEN=" | ForEach-Object { $_ -replace '^COMPAINION_UI_ADMIN_TOKEN=', '' -replace '"', '' })
-    if (-not $adminToken) { $adminToken = "CompAdmin#2025!" }
-    Write-Host "   Admin-Token: $adminToken" -ForegroundColor Gray
+    Write-Host "[Einstellungen] KommunalGPT-Dashboard:" -ForegroundColor Yellow
+    Write-Host "   Admin-Token: siehe COMPAINION_UI_ADMIN_TOKEN in der Datei .env" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "🤖 Open WebUI (Administration):" -ForegroundColor Yellow
-    Write-Host "   http://localhost:$WebuiPort" -ForegroundColor White
+    Write-Host "[Administration] Open WebUI:" -ForegroundColor Yellow
+    Write-Host "   http://${serverHost}:$WebuiPort" -ForegroundColor White
     Write-Host "   E-Mail: info@KommunalGPT.de" -ForegroundColor Gray
-    Write-Host "   Passwort: CompAdmin#2025!" -ForegroundColor Gray
     Write-Host ""
-    if ($ollamaType -eq "docker") {
-        Write-Host "🧠 Ollama API:" -ForegroundColor Yellow
-        Write-Host "   http://localhost:$OllamaPort" -ForegroundColor White
-        Write-Host ""
-    }
-    Write-Host "📄 Apache Tika (Dokumentenverarbeitung):" -ForegroundColor Yellow
-    Write-Host "   http://localhost:$TikaPort" -ForegroundColor White
+    Write-Host "WICHTIG: Melden Sie sich jetzt an und aendern Sie das Administrator-Passwort." -ForegroundColor Red
+    Write-Host "   Das Auslieferungspasswort ist oeffentlich dokumentiert und auf jeder Installation" -ForegroundColor Red
+    Write-Host "   identisch. Solange es gilt, ist Ihre Installation nicht geschuetzt." -ForegroundColor Red
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
 

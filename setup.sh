@@ -27,35 +27,57 @@ check_port() {
 }
 
 # Funktion: Alternativen Port abfragen
+# WICHTIG: Der gewaehlte Port wird ueber stdout zurueckgegeben und per Command-Substitution
+# eingefangen. Alle Meldungen muessen deshalb nach stderr gehen, sonst landen sie im Portwert.
 ask_alternative_port() {
   local service=$1
   local default_port=$2
   local new_port
-  
+
   while true; do
-    read -rp "Port für $service [Vorschlag: $default_port]: " new_port
+    read -rp "Port für $service [Vorschlag: $default_port]: " new_port >&2
     new_port="${new_port:-$default_port}"
-    
+
     if ! [[ "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
-      warn "Ungültiger Port. Bitte eine Zahl zwischen 1 und 65535 eingeben."
+      warn "Ungültiger Port. Bitte eine Zahl zwischen 1 und 65535 eingeben." >&2
       continue
     fi
-    
+
     if check_port "$new_port"; then
-      warn "Port $new_port ist bereits belegt. Bitte einen anderen Port wählen."
+      warn "Port $new_port ist bereits belegt. Bitte einen anderen Port wählen." >&2
       continue
     fi
-    
+
     # Prüfe ob Port bereits von einem anderen Service reserviert wurde
     if [[ "$new_port" == "$OLLAMA_PORT" ]] || [[ "$new_port" == "$WEBUI_PORT" ]] || \
        [[ "$new_port" == "$TIKA_PORT" ]] || [[ "$new_port" == "$COMPAINION_UI_PORT" ]]; then
-      warn "Port $new_port wird bereits von einem anderen Service verwendet. Bitte einen anderen Port wählen."
+      warn "Port $new_port wird bereits von einem anderen Service verwendet. Bitte einen anderen Port wählen." >&2
       continue
     fi
-    
+
     echo "$new_port"
     return 0
   done
+}
+
+# Funktion: Schluessel=Wert in der .env setzen (anlegen oder ersetzen)
+set_env() {
+  local key=$1
+  local value=$2
+  touch .env
+  if grep -q "^${key}=" .env; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|g" .env
+    rm -f .env.bak
+  else
+    echo "${key}=${value}" >> .env
+  fi
+}
+
+# Funktion: Wert aus einer env-Datei lesen
+get_env_value() {
+  local key=$1
+  local file=$2
+  grep "^${key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d "'\"" || true
 }
 
 # 1) Name abfragen
@@ -64,36 +86,51 @@ read -rp "Wie soll dein GPT heißen? [${DEFAULT_NAME}]: " COMPAINION_NAME
 COMPAINION_NAME="${COMPAINION_NAME:-$DEFAULT_NAME}"
 ok "Name gesetzt: ${COMPAINION_NAME}"
 
-# 2) Port-Prüfung und Konfiguration
+# 2) .env anlegen (vor der Port-Pruefung, damit die Ports direkt dort landen)
+title "Konfiguriere .env"
+if [[ ! -f ".env" ]]; then
+  if [[ -f ".env.example" ]]; then
+    cp .env.example .env
+    ok ".env aus .env.example erstellt"
+  else
+    touch .env
+    warn ".env.example nicht gefunden - leere .env angelegt"
+  fi
+else
+  ok "Bestehende .env wird weiterverwendet"
+fi
+
+set_env "COMPAINION_NAME" "'${COMPAINION_NAME}'"
+
+# 3) Port-Prüfung und Konfiguration
 title "Prüfe Ports"
 
-# Lese Standard-Ports aus .env.example
-if [[ -f ".env.example" ]]; then
-  OLLAMA_PORT=$(grep "^OLLAMA_PORT=" .env.example | cut -d'=' -f2)
-  WEBUI_PORT=$(grep "^WEBUI_PORT=" .env.example | cut -d'=' -f2)
-  TIKA_PORT=$(grep "^TIKA_PORT=" .env.example | cut -d'=' -f2)
-  COMPAINION_UI_PORT=$(grep "^COMPAINION_UI_PORT=" .env.example | cut -d'=' -f2)
-else
-  warn ".env.example nicht gefunden, verwende Standard-Ports"
-  OLLAMA_PORT=11434
-  WEBUI_PORT=3000
-  TIKA_PORT=9998
-  COMPAINION_UI_PORT=80
-fi
+# Lese aktuelle Ports aus der .env (nicht aus der versionierten Vorlage .env.example)
+OLLAMA_PORT=$(get_env_value "OLLAMA_PORT" .env)
+WEBUI_PORT=$(get_env_value "WEBUI_PORT" .env)
+TIKA_PORT=$(get_env_value "TIKA_PORT" .env)
+COMPAINION_UI_PORT=$(get_env_value "COMPAINION_UI_PORT" .env)
+
+OLLAMA_PORT="${OLLAMA_PORT:-11434}"
+WEBUI_PORT="${WEBUI_PORT:-3000}"
+TIKA_PORT="${TIKA_PORT:-9998}"
+COMPAINION_UI_PORT="${COMPAINION_UI_PORT:-8080}"
 
 # Prüfe jeden Port
 PORTS_CHANGED=false
 
 # Spezielle Prüfung für Ollama-Port
+# Achtung: Open WebUI spricht Ollama laut mitgelieferter Datenbank fest ueber Port 11434 an.
+# Ein Ausweichen auf einen anderen Port wuerde die Anbindung lautlos zerstoeren - deshalb wird
+# hier abgebrochen statt umkonfiguriert.
 if check_port "$OLLAMA_PORT"; then
-  # Port ist belegt - prüfe ob es Ollama ist
   if curl -s http://localhost:${OLLAMA_PORT}/api/version >/dev/null 2>&1; then
     ok "Port $OLLAMA_PORT ist von Ollama belegt - wird verwendet"
   else
-    warn "Port $OLLAMA_PORT (Ollama) ist belegt, aber nicht durch Ollama!"
-    OLLAMA_PORT=$(ask_alternative_port "Ollama" "11435")
-    PORTS_CHANGED=true
-    ok "Neuer Ollama-Port: $OLLAMA_PORT"
+    warn "Port $OLLAMA_PORT wird von einem anderen Dienst belegt - nicht von Ollama."
+    warn "KommunalGPT benoetigt diesen Port zwingend fuer die Ollama-Anbindung."
+    warn "Bitte geben Sie Port $OLLAMA_PORT frei und starten Sie das Setup erneut."
+    exit 1
   fi
 else
   ok "Port $OLLAMA_PORT (Ollama) ist frei"
@@ -126,37 +163,24 @@ else
   ok "Port $COMPAINION_UI_PORT (KommunalGPT-Dashboard) ist frei"
 fi
 
-# Aktualisiere .env.example wenn Ports geändert wurden
-if [[ "$PORTS_CHANGED" == "true" ]] && [[ -f ".env.example" ]]; then
-  info "Aktualisiere .env.example mit neuen Ports..."
-  cp .env.example .env.example.bak
-  sed -i.tmp "s|^OLLAMA_PORT=.*|OLLAMA_PORT=$OLLAMA_PORT|g" .env.example
-  sed -i.tmp "s|^WEBUI_PORT=.*|WEBUI_PORT=$WEBUI_PORT|g" .env.example
-  sed -i.tmp "s|^TIKA_PORT=.*|TIKA_PORT=$TIKA_PORT|g" .env.example
-  sed -i.tmp "s|^COMPAINION_UI_PORT=.*|COMPAINION_UI_PORT=$COMPAINION_UI_PORT|g" .env.example
-  rm -f .env.example.tmp
-  ok ".env.example aktualisiert (Backup: .env.example.bak)"
+# Ports in die .env schreiben (NICHT in die versionierte Vorlage .env.example)
+if [[ "$PORTS_CHANGED" == "true" ]]; then
+  info "Uebernehme neue Ports in die .env..."
 fi
+set_env "OLLAMA_PORT" "$OLLAMA_PORT"
+set_env "WEBUI_PORT" "$WEBUI_PORT"
+set_env "TIKA_PORT" "$TIKA_PORT"
+set_env "COMPAINION_UI_PORT" "$COMPAINION_UI_PORT"
 
-# 3) .env erstellen/aktualisieren
-title "Konfiguriere .env"
-if [[ ! -f ".env" && -f ".env.example" ]]; then
-  cp .env.example .env
-fi
-touch .env
-# COMPAINION_NAME setzen/ersetzen
-if grep -q "^COMPAINION_NAME=" .env; then
-  sed -i.bak "s|^COMPAINION_NAME=.*|COMPAINION_NAME='${COMPAINION_NAME}'|g" .env
-else
-  echo "COMPAINION_NAME='${COMPAINION_NAME}'" >> .env
-fi
-# OLLAMA_BASE_URL setzen/ersetzen (mit dynamischem Port)
-if grep -q "^OLLAMA_BASE_URL=" .env; then
-  sed -i.bak "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL='http://localhost:${OLLAMA_PORT}'|g" .env
-else
-  echo "OLLAMA_BASE_URL='http://localhost:${OLLAMA_PORT}'" >> .env
-fi
-rm -f .env.bak
+# Dashboard-Weiterleitung auf den tatsaechlichen Host setzen, damit der Link auch von
+# Arbeitsplatz-Rechnern funktioniert und nicht auf deren eigenen "localhost" zeigt.
+DEFAULT_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
+DEFAULT_HOST="${DEFAULT_HOST:-localhost}"
+read -rp "Unter welchem Hostnamen/IP ist dieser Server erreichbar? [${DEFAULT_HOST}]: " SERVER_HOST
+SERVER_HOST="${SERVER_HOST:-$DEFAULT_HOST}"
+set_env "COMPAINION_DEFAULT_URL" "\"http://${SERVER_HOST}:\${WEBUI_PORT}\""
+ok "Dashboard verweist auf http://${SERVER_HOST}:${WEBUI_PORT}"
+
 ok ".env aktualisiert"
 
 # 4) Docker installieren/prüfen
@@ -261,19 +285,42 @@ else
   ok "Modelle werden nach dem Start in den Container geladen."
 fi
 
-# Ollama-Section in docker-compose.yml auskommentieren wenn lokal installiert
+# Ollama-Container per Compose-Profil zu- oder abschalten.
+# Frueher wurde die Ollama-Sektion ueber feste Zeilennummern auskommentiert - das zerbrach bei
+# jeder Aenderung am Dateikopf. Das Profil "ollama" ist dagegen unabhaengig vom Dateiaufbau.
 if [[ "$OLLAMA_TYPE" == "local" ]]; then
-  info "Kommentiere Ollama-Container in docker-compose.yml aus..."
-  if [[ -f "docker-compose.yml" ]]; then
-    # Backup erstellen
-    cp docker-compose.yml docker-compose.yml.bak
-    
-    # Ollama-Section auskommentieren (Zeilen 6-17)
-    sed -i.tmp '6,17s/^/# /' docker-compose.yml
-    rm -f docker-compose.yml.tmp
-    
-    ok "Ollama-Container in docker-compose.yml auskommentiert"
-    info "Backup gespeichert als: docker-compose.yml.bak"
+  set_env "COMPOSE_PROFILES" ""
+  ok "Lokales Ollama wird verwendet - der Ollama-Container bleibt ausgeschaltet."
+else
+  set_env "COMPOSE_PROFILES" "ollama"
+  ok "Ollama wird als Container bereitgestellt (Compose-Profil 'ollama' aktiv)."
+fi
+
+# Erreichbarkeit aus einem Container heraus pruefen.
+# Open WebUI spricht Ollama als http://host.docker.internal:11434 an. Ein lokal per systemd
+# installiertes Ollama lauscht standardmaessig nur auf 127.0.0.1 und ist von dort NICHT
+# erreichbar - das faellt sonst erst auf, wenn der erste Nutzer einen leeren Modellkatalog sieht.
+if [[ "$OLLAMA_TYPE" == "local" ]]; then
+  title "Prüfe Ollama-Erreichbarkeit aus dem Container"
+  if docker run --rm --add-host=host.docker.internal:host-gateway curlimages/curl:latest \
+       -s --max-time 10 "http://host.docker.internal:${OLLAMA_PORT}/api/version" >/dev/null 2>&1; then
+    ok "Ollama ist aus dem Container erreichbar"
+  else
+    warn "Ollama laeuft lokal, ist aus dem Docker-Container aber NICHT erreichbar."
+    warn "Open WebUI wuerde dadurch ohne Modelle starten."
+    echo ""
+    echo "Ursache: Ollama lauscht vermutlich nur auf 127.0.0.1."
+    echo "Abhilfe (Linux/systemd):"
+    echo "  sudo systemctl edit ollama"
+    echo "  [Service]"
+    echo "  Environment=\"OLLAMA_HOST=0.0.0.0\""
+    echo "  sudo systemctl restart ollama"
+    echo ""
+    read -rp "Trotzdem fortfahren? [j/N]: " CONTINUE_ANYWAY
+    if [[ ! "$CONTINUE_ANYWAY" =~ ^[jJyY]$ ]]; then
+      info "Setup abgebrochen. Bitte Ollama erreichbar machen und erneut starten."
+      exit 1
+    fi
   fi
 fi
 
@@ -284,25 +331,33 @@ docker compose pull
 
 # 7) Initialstart nur OWUI (Ressourcen anlegen)
 title "Initialer Start (Ressourcen anlegen)"
-warn "Es wird nun eventuell das Passwort des Systemadministrators abgefragt. Dieses wird nicht gespeichert, sondern nur zum Kopieren der System-Datenbank benötigt."
 docker compose up -d kommunal-gpt
 sleep 20
 docker compose down
 
-# 8) DB/Statics kopieren
+# 8) Standard-Datenbank einsetzen
+# Hinweis: Das Branding von Open WebUI wird bewusst NICHT mehr ueberschrieben. Frueher wurden
+# hier static/*.* nach owui/static/ kopiert - das ersetzte Favicon und Splash von Open WebUI und
+# stand damit im Konflikt mit dessen Branding-Klausel. Der Name bleibt ueber WEBUI_NAME erhalten.
 title "Standard-Datenbank einsetzen"
 if [[ -f "master-webui.db" ]]; then
-  sudo cp -f master-webui.db owui/data/webui.db
-  ok "DB eingesetzt: owui/data/webui.db"
+  mkdir -p owui/data
+  # Erst ohne sudo versuchen - auf den meisten Systemen gehoert das Verzeichnis dem Benutzer.
+  if cp -f master-webui.db owui/data/webui.db 2>/dev/null; then
+    ok "DB eingesetzt: owui/data/webui.db"
+  else
+    warn "Kopieren ohne erweiterte Rechte fehlgeschlagen - versuche es mit sudo."
+    warn "Das Passwort wird nicht gespeichert, sondern nur fuer diesen Kopiervorgang benoetigt."
+    if sudo cp -f master-webui.db owui/data/webui.db; then
+      ok "DB eingesetzt: owui/data/webui.db"
+    else
+      warn "Die Standard-Datenbank konnte nicht eingesetzt werden."
+      warn "Open WebUI wuerde ohne die vorkonfigurierten Assistenten starten. Setup abgebrochen."
+      exit 1
+    fi
+  fi
 else
   warn "master-webui.db nicht gefunden – übersprungen."
-fi
-
-if compgen -G "static/*.*" >/dev/null; then
-  sudo cp -f static/*.* owui/static/ || true
-  ok "Konfiguration eingespielt"
-else
-  warn "Keine Konfiguration gefunden – übersprungen."
 fi
 
 # 9) Gesamtsystem starten
@@ -315,12 +370,19 @@ fi
 docker compose up -d
 
 # 10) Optional: Modelle laden
-warn "Die Modelle werden jetzt geladen, dies kann je nach Geschwindigkeit Ihrer Internetverbindung eine Weile dauern!"
-if [[ -x "./models.sh" ]]; then
-  chmod +x models.sh
-  ./models.sh
+title "Sprachmodelle"
+echo "Die Sprachmodelle koennen jetzt geladen werden. Das sind je nach Auswahl mehrere"
+echo "Gigabyte und kann eine Weile dauern. Sie koennen das auch spaeter mit ./models.sh nachholen."
+read -rp "Modelle jetzt laden? [j/N]: " LOAD_MODELS
+if [[ "$LOAD_MODELS" =~ ^[jJyY]$ ]]; then
+  if [[ -f "./models.sh" ]]; then
+    chmod +x models.sh
+    ./models.sh || warn "Beim Laden der Modelle sind Fehler aufgetreten - siehe Ausgabe oben."
+  else
+    warn "models.sh nicht vorhanden."
+  fi
 else
-  warn "models.sh nicht ausführbar oder nicht vorhanden."
+  info "Modelle uebersprungen. Nachholen jederzeit mit: ./models.sh"
 fi
 
 ok "Setup abgeschlossen."
@@ -330,14 +392,17 @@ echo "  KommunalGPT ist bereit!"
 echo "=========================================="
 echo ""
 echo "📊 KommunalGPT-Dashboard (Startseite fuer Nutzer):"
-echo "   http://localhost:${COMPAINION_UI_PORT}"
+echo "   http://${SERVER_HOST}:${COMPAINION_UI_PORT}"
 echo ""
 echo "🔧 KommunalGPT-Dashboard Einstellungen:"
-echo "   Admin-Token: $(grep '^COMPAINION_UI_ADMIN_TOKEN=' .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo 'CompAdmin#2025!')"
+echo "   Admin-Token: siehe COMPAINION_UI_ADMIN_TOKEN in der Datei .env"
 echo ""
 echo "🤖 Open WebUI (Administration):"
-echo "   http://localhost:${WEBUI_PORT}"
+echo "   http://${SERVER_HOST}:${WEBUI_PORT}"
 echo "   E-Mail: info@KommunalGPT.de"
-echo "   Passwort: CompAdmin#2025!"
+echo ""
+echo "⚠️  WICHTIG: Melden Sie sich jetzt an und aendern Sie das Administrator-Passwort."
+echo "   Das Auslieferungspasswort ist oeffentlich dokumentiert und auf jeder Installation"
+echo "   identisch. Solange es gilt, ist Ihre Installation nicht geschuetzt."
 echo ""
 echo "=========================================="
