@@ -60,7 +60,7 @@ Sollten einzelne Bestimmungen dieser Nutzungsbedingungen unwirksam sein oder wer
 ## 14. Kontakt
 
 KommunalGPT powered by compAInion
-E-Mail: kontakt@KommunalGPT.de
+E-Mail: info@KommunalGPT.de
 Web: https://KommunalGPT.de
 
 deepmentation UG (haftungsbeschränkt)
@@ -68,4 +68,3 @@ Hans-Poeche-Str. 8
 04103 Leipzig
 Deutschland
 https://deepmentation.ai
-hello@deepmentation.ai
