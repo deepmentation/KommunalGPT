@@ -73,6 +73,21 @@ set_env() {
   fi
 }
 
+# Funktion: primaere IP des Hosts ermitteln (Linux und macOS), Rueckfall auf localhost.
+# Darf unter "set -euo pipefail" niemals fehlschlagen - "hostname -I" gibt es z. B. nur unter Linux.
+detect_host_ip() {
+  local ip=""
+  if ip="$(hostname -I 2>/dev/null)"; then
+    ip="$(echo "$ip" | awk '{print $1}')"
+  else
+    ip=""
+  fi
+  if [[ -z "$ip" ]] && command -v ipconfig >/dev/null 2>&1; then
+    ip="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+  fi
+  echo "${ip:-localhost}"
+}
+
 # Funktion: Wert aus einer env-Datei lesen
 get_env_value() {
   local key=$1
@@ -174,8 +189,7 @@ set_env "COMPAINION_UI_PORT" "$COMPAINION_UI_PORT"
 
 # Dashboard-Weiterleitung auf den tatsaechlichen Host setzen, damit der Link auch von
 # Arbeitsplatz-Rechnern funktioniert und nicht auf deren eigenen "localhost" zeigt.
-DEFAULT_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
-DEFAULT_HOST="${DEFAULT_HOST:-localhost}"
+DEFAULT_HOST="$(detect_host_ip)"
 read -rp "Unter welchem Hostnamen/IP ist dieser Server erreichbar? [${DEFAULT_HOST}]: " SERVER_HOST
 SERVER_HOST="${SERVER_HOST:-$DEFAULT_HOST}"
 set_env "COMPAINION_DEFAULT_URL" "\"http://${SERVER_HOST}:\${WEBUI_PORT}\""
