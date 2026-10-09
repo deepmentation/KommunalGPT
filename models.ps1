@@ -4,15 +4,13 @@
 # Set error action preference
 $ErrorActionPreference = "Stop"
 
-# Model list
+# Modellliste - muss zu den Basismodellen der Assistenten in master-webui.db passen (siehe MODELS.md)
 $Models = @(
-    "llama3.1:8b",
-    "gemma3:12b", 
-    "qwen3:14b",
-    "gpt-oss:20b",
-    "qwen2.5-coder:14b",
-    "llava:13b",
-    "jina/jina-embeddings-v2-base-de"
+    "gemma3:12b",                      # ChatBot, Text-Assistenten, Uebersetzung, Bildbeschreiber
+    "qwen3:14b",                       # Brainstorming, Recherche, Dateninterpretation
+    "qwen2.5-coder:14b",               # Code-Unterstuetzung
+    "llama3.2:3b",                     # Chat-Titel und Autovervollstaendigung
+    "jina/jina-embeddings-v2-base-de"  # Dokumente / Wissensdatenbanken (Embedding)
 )
 
 # Helper functions
@@ -190,6 +188,7 @@ try {
     if ($failCount -gt 0) {
         Write-Warning "Fehlgeschlagen: $failCount Modelle"
         Write-Info "Bitte ueberpruefen Sie die Fehler und versuchen Sie es bei Bedarf erneut."
+        exit 1
     } else {
         Write-Success "Alle Modelle erfolgreich geladen!"
     }
