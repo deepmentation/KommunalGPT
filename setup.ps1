@@ -486,6 +486,16 @@ try {
 
         Set-EnvValue "COMPAINION_NAME" "'$GPTName'"
 
+        # Image-Versionen kommen immer aus der Vorlage: Sie sind eine Produktvorgabe (passend zur
+        # Master-DB), keine Kundeneinstellung. Sonst bliebe in einer bestehenden .env "latest" stehen.
+        if (Test-Path ".env.example") {
+            foreach ($key in @("OLLAMA_IMAGE","OLLAMA_DOCKER_TAG","WEBUI_IMAGE","WEBUI_TAG","TIKA_IMAGE","TIKA_TAG","COMPAINION_UI_IMAGE","COMPAINION_UI_TAG")) {
+                $val = Get-EnvValue $key ".env.example"
+                if ($val) { Set-EnvValue $key "'$val'" }
+            }
+            Write-Success "Image-Versionen aus .env.example uebernommen (Open WebUI: $(Get-EnvValue 'WEBUI_TAG'))"
+        }
+
         # Dashboard-Weiterleitung auf den tatsaechlichen Host setzen, damit der Link auch von
         # Arbeitsplatz-Rechnern funktioniert und nicht auf deren eigenen "localhost" zeigt.
         $defaultHost = "localhost"
@@ -499,6 +509,7 @@ try {
         if ([string]::IsNullOrEmpty($serverHost)) { $serverHost = $defaultHost }
         Set-EnvValue "SERVER_HOST" $serverHost
         Set-EnvValue "COMPAINION_DEFAULT_URL" ('"http://' + $serverHost + ':${WEBUI_PORT}"')
+        Set-EnvValue "WEBUI_URL" ('"http://' + $serverHost + ':${WEBUI_PORT}"')
         Write-Success "Dashboard verweist auf http://${serverHost}:$WebuiPort"
 
         Write-Success ".env aktualisiert"
@@ -846,10 +857,10 @@ try {
     Write-Host "[Administration] Open WebUI:" -ForegroundColor Yellow
     Write-Host "   http://${serverHost}:$WebuiPort" -ForegroundColor White
     Write-Host "   E-Mail: info@KommunalGPT.de" -ForegroundColor Gray
+    Write-Host "   Passwort: CompAdmin#2025!" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "WICHTIG: Melden Sie sich jetzt an und aendern Sie das Administrator-Passwort." -ForegroundColor Red
-    Write-Host "   Das Auslieferungspasswort ist oeffentlich dokumentiert und auf jeder Installation" -ForegroundColor Red
-    Write-Host "   identisch. Solange es gilt, ist Ihre Installation nicht geschuetzt." -ForegroundColor Red
+    Write-Host "Bitte aendern Sie das Administrator-Passwort nach der ersten Anmeldung." -ForegroundColor Yellow
+    Write-Host "   Das Startpasswort ist oeffentlich dokumentiert und auf jeder Installation gleich." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
 

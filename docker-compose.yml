@@ -37,6 +37,8 @@ services:
       # CUSTOM_NAME wurde bewusst entfernt - es umgeht diesen Zusatz (Whitelabel-Pfad nur fuer
       # registrierte Kunden) und laedt bei JEDEM Containerstart ungefragt von api.openwebui.com.
       - WEBUI_NAME=${COMPAINION_NAME}
+      # Nur Startwert: Open WebUI uebernimmt ihn, solange webui.url nicht in der Datenbank steht.
+      - WEBUI_URL=${WEBUI_URL}
       - ENABLE_SIGNUP=${ENABLE_SIGNUP}
       - DEFAULT_LOCALE=${DEFAULT_LOCALE}
       - USE_CUDA_DOCKER=${USE_CUDA_DOCKER}

@@ -117,6 +117,18 @@ fi
 
 set_env "COMPAINION_NAME" "'${COMPAINION_NAME}'"
 
+# Image-Versionen kommen immer aus der Vorlage: Sie sind eine Produktvorgabe (passend zur
+# Master-DB), keine Kundeneinstellung. Sonst bliebe in einer bestehenden .env z. B. "latest" stehen.
+if [[ -f ".env.example" ]]; then
+  for key in OLLAMA_IMAGE OLLAMA_DOCKER_TAG WEBUI_IMAGE WEBUI_TAG TIKA_IMAGE TIKA_TAG COMPAINION_UI_IMAGE COMPAINION_UI_TAG; do
+    val="$(grep "^${key}=" .env.example | head -1 | cut -d'=' -f2- || true)"
+    if [[ -n "$val" ]]; then
+      set_env "$key" "$val"
+    fi
+  done
+  ok "Image-Versionen aus .env.example übernommen (Open WebUI: $(get_env_value WEBUI_TAG .env))"
+fi
+
 # 3) Port-Prüfung und Konfiguration
 title "Prüfe Ports"
 
@@ -193,6 +205,7 @@ DEFAULT_HOST="$(detect_host_ip)"
 read -rp "Unter welchem Hostnamen/IP ist dieser Server erreichbar? [${DEFAULT_HOST}]: " SERVER_HOST
 SERVER_HOST="${SERVER_HOST:-$DEFAULT_HOST}"
 set_env "COMPAINION_DEFAULT_URL" "\"http://${SERVER_HOST}:\${WEBUI_PORT}\""
+set_env "WEBUI_URL" "\"http://${SERVER_HOST}:\${WEBUI_PORT}\""
 ok "Dashboard verweist auf http://${SERVER_HOST}:${WEBUI_PORT}"
 
 ok ".env aktualisiert"
@@ -418,9 +431,9 @@ echo ""
 echo "🤖 Open WebUI (Administration):"
 echo "   http://${SERVER_HOST}:${WEBUI_PORT}"
 echo "   E-Mail: info@KommunalGPT.de"
+echo "   Passwort: CompAdmin#2025!"
 echo ""
-echo "⚠️  WICHTIG: Melden Sie sich jetzt an und aendern Sie das Administrator-Passwort."
-echo "   Das Auslieferungspasswort ist oeffentlich dokumentiert und auf jeder Installation"
-echo "   identisch. Solange es gilt, ist Ihre Installation nicht geschuetzt."
+echo "⚠️  Bitte aendern Sie das Administrator-Passwort nach der ersten Anmeldung."
+echo "   Das Startpasswort ist oeffentlich dokumentiert und auf jeder Installation gleich."
 echo ""
 echo "=========================================="
