@@ -126,13 +126,26 @@ jobs:
         run: |
           mkdir -p artifacts
           
+          # LICENSE, NOTICE, README.md, MODELS.md, Licenses.md und Nutzungsbedingungen.md
+          # gehoeren in jede Auslieferung (Apache-2.0 §4 verlangt LICENSE und NOTICE).
+          # Nicht ausgeliefert: Repo-Interna und Werkzeuge fuer die Pflege der Master-DB.
+          # static/ wird seit der Ruecknahme des Open-WebUI-Brandings nicht mehr eingespielt.
+          EXCLUDE=(".git/*" ".github/*" "artifacts/*" "scripts/*" "assets/*" "static/*" "TODO.md" ".gitignore")
+
           # Windows-Version (ohne .sh Dateien)
           zip -r "artifacts/KommunalGPT-windows-${{ needs.versioning.outputs.new_version }}.zip" . \
-            -x "*.sh" ".git/*" ".github/*" "artifacts/*" "*.md" "LICENSE"
-          
-          # Linux-Version (ohne .bat/.ps1 Dateien)
+            -x "*.sh" "${EXCLUDE[@]}"
+
+          # Linux-Version (ohne .ps1 Dateien)
           zip -r "artifacts/KommunalGPT-linux-${{ needs.versioning.outputs.new_version }}.zip" . \
-            -x "*.bat" "*.ps1" "UpdateEnv.ps1" ".git/*" ".github/*" "artifacts/*" "*.md" "LICENSE"
+            -x "*.ps1" "${EXCLUDE[@]}"
+
+          # Pflichtdateien pruefen
+          for z in artifacts/*.zip; do
+            for f in LICENSE NOTICE README.md Licenses.md Nutzungsbedingungen.md MODELS.md master-webui.db docker-compose.yml .env.example; do
+              unzip -l "$z" | grep -q " $f\$" || { echo "FEHLT in $z: $f"; exit 1; }
+            done
+          done
           
           echo "Erstellte Artefakte:"
           ls -la artifacts/
@@ -165,7 +178,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.versioning.outputs.new_tag }}
           name: KommunalGPT v${{ needs.versioning.outputs.new_version }}

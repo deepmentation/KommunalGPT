@@ -5,3 +5,7 @@ node_modules/
 
 # Ignore local env files
 .env
+
+# ROADMAP
+TODO.md
+__pycache__/

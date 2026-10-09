@@ -1,0 +1,34 @@
+name: Prüfung
+
+# Läuft bei jedem Push und Pull Request. Verhindert, dass eine fehlerhafte
+# master-webui.db oder kaputte Setup-Skripte ausgeliefert werden.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: master-webui.db, Modelllisten und MODELS.md prüfen
+        run: python3 scripts/check_master_db.py
+
+      - name: Shell-Skripte (Syntax)
+        run: bash -n setup.sh && bash -n models.sh && echo "OK"
+
+      - name: PowerShell-Skripte (PowerShell 7 und 5.1)
+        shell: pwsh
+        run: ./scripts/check_powershell.ps1
+
+      - name: docker-compose.yml mit .env.example
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          COMPOSE_PROFILES=ollama docker compose config --services | grep -qx ollama
+          echo "OK"

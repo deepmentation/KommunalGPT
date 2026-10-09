@@ -9,7 +9,7 @@ nicht von Hand geschrieben, sondern aus der Datenbank erzeugt:
 """
 import json
 import sqlite3
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,7 +25,7 @@ ORDER = [
 ]
 
 
-def main():
+def render():
     con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     rows = {
         r[0]: r for r in con.execute(
@@ -35,13 +35,17 @@ def main():
     cfg = dict(con.execute(
         "select key, value from config where key in "
         "('task.model.default', 'rag.embedding_model')").fetchall())
+    # Stand = letzte Aenderung an einem Assistenten. Damit ist die Ausgabe reproduzierbar und
+    # die CI kann pruefen, ob MODELS.md zur DB passt (heutiges Datum wuerde jeden Tag abweichen).
+    stand = datetime.fromtimestamp(con.execute(
+        "select max(updated_at) from model where base_model_id != ''").fetchone()[0], timezone.utc)
     task_model = json.loads(cfg.get("task.model.default", '""'))
     embed_model = json.loads(cfg.get("rag.embedding_model", '""'))
 
     ids = [i for i in ORDER if i in rows] + sorted(i for i in rows if i not in ORDER)
     out = []
     out.append("# MODELLE IN KommunalGPT powered by compAInion\n")
-    out.append(f"*Stand: {date.today():%d.%m.%Y} – erzeugt aus `master-webui.db` "
+    out.append(f"*Stand: {stand:%d.%m.%Y} – erzeugt aus `master-webui.db` "
                "mit `scripts/gen_models_md.py`. Bitte nicht von Hand bearbeiten.*\n")
     out.append("Die Assistenten, ihre Beschreibungen und Systemprompts wurden von der "
                "deepmentation UG (haftungsbeschränkt) entwickelt. Siehe [NOTICE](NOTICE).\n")
@@ -75,7 +79,12 @@ def main():
         if system:
             out.append("**Systemprompt:**\n")
             out.append("```text\n" + system + "\n```\n")
-    OUT.write_text("\n".join(out), encoding="utf-8")
+    return "\n".join(out), ids, bases
+
+
+def main():
+    text, ids, bases = render()
+    OUT.write_text(text, encoding="utf-8")
     print(f"{OUT.name} geschrieben: {len(ids)} Assistenten, Modelle: {', '.join(bases)}")
 
 
