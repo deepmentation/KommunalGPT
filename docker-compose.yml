@@ -52,7 +52,10 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      - COMPAINION_UI_PORT=${COMPAINION_UI_PORT}
+      # Interner Port des Dashboards ist fest 80 (siehe Port-Mapping oben). COMPAINION_UI_PORT ist
+      # nur der Host-Port und darf NICHT in den Container gelangen - server.js wuerde sonst auf
+      # diesem Port lauschen und das Mapping auf Port 80 liefe ins Leere.
+      - PORT=80
       - COMPAINION_UI_READONLY=${COMPAINION_UI_READONLY}
       - COMPAINION_UI_ADMIN_TOKEN=${COMPAINION_UI_ADMIN_TOKEN}
       - COMPAINION_NAME=${COMPAINION_NAME}
