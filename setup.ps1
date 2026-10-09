@@ -736,6 +736,10 @@ try {
 
     if (Test-Path "master-webui.db") {
         try {
+            # WAL-Dateien des initialen Starts entfernen. Open WebUI arbeitet im SQLite-WAL-Modus und
+            # hinterlaesst beim Stoppen webui.db-wal/-shm. Bleiben sie neben der eingespielten
+            # Master-DB liegen, spielt SQLite sie ein -> "database disk image is malformed".
+            Remove-Item "owui\data\webui.db-wal", "owui\data\webui.db-shm" -Force -ErrorAction SilentlyContinue
             Copy-Item "master-webui.db" "owui\data\webui.db" -Force -ErrorAction Stop
             Write-Success "DB eingesetzt: owui\data\webui.db"
         }
